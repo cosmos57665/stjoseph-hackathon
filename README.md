@@ -19,13 +19,19 @@ The included two-page practice PDF opens automatically. Page one has selectable
 text; page two is a raster scan to exercise on-device OCR. The app includes a
 printable, single-page Morse alphabet sheet.
 
-1. Open **Practice**. Rest a finger lightly on the trackpad and compare **Feel dot**
+1. At the welcome screen, click the trackpad **three times quickly** to enter touch
+   mode. The pointer is centered, held in the app and hidden. Press **Escape** to
+   pause, restore it and use the standard interface. This selects an interaction
+   preference; it does not diagnose or record a disability.
+2. **Double-click** to start, pause or resume. Swipe **two fingers left/right** for
+   the next/previous line, **up/down** for faster/slower, and secondary-click to
+   replay. Each completed line waits for input. Navigation crosses page boundaries
+   and skips empty pages. See the [complete controls and test guide](docs/Controls-Guide.md).
+3. In the standard interface, open **Practice**. Rest a finger lightly on the trackpad and compare **Feel dot**
    with **Feel dash**. Playback starts after a short delay.
-2. Try E, T, A, then HI. Use the Morse sheet from the dock or Help menu.
-3. In **Reader**, choose a short passage and press Play. Pause repeats the current
-   letter when resumed. Previous/next skips words. Restart returns to the beginning.
-4. Open **Connections**, paste one provider key, select its card and test the connection.
-5. Use **AI transcription** to transcribe a page or all remaining pages. This sends
+4. Try E, T, A, then HI. Use the Morse sheet from the dock or Help menu.
+5. Open **Connections**, paste one provider key, select its card and test the connection.
+6. Use **AI transcription** to transcribe a page or all remaining pages. This sends
    page images to the selected provider and may incur API charges.
 
 ## Providers and keys
@@ -63,9 +69,14 @@ provider calls were made during initial development because no user keys were su
   are preserved if a later page fails. Simplification is separate from the original.
 - **Morse**: deterministic character lookup and standard 1/3/7 timing envelopes.
   Encoding and timeline calculation are O(n). No AI is needed for encoding.
-- **HapticPlayer**: cancellable playback, word navigation, speed and progress.
+- **HapticPlayer**: cancellable playback, speed, progress and distinct command cues.
   Uses public AppKit APIs. Dots request one short effect; dashes request a longer
   train of effects over a three-unit envelope.
+- **TouchControlSurface / PointerCapture**: window-local native click, scroll and
+  keyboard input; one command per physical swipe, with momentum ignored. Pointer
+  capture is foreground-only and ends on Escape, focus loss or window changes.
+  No global input hooks or Accessibility permission are needed. Reading uses
+  nonempty source/OCR lines without arbitrary word-count splits.
 - **SwiftUI**: reader, practice, provider settings, original-PDF preview, text export,
   keyboard actions, system accessibility labels, reduced-motion handling and a
   solid-surface option (also respects Reduce Transparency).
@@ -88,6 +99,11 @@ document persistence and recovery are not implemented. The app is locally ad-hoc
 signed, not notarized for distribution. Native VoiceOver labels are included, but
 real VoiceOver/Braille-display and intended-user testing remain outstanding.
 
+Touch mode operates a prepared lesson. Importing PDFs and entering API keys use
+the standard interface, potentially with a helper. The learner needs prior
+instruction in the gestures and tactile Morse; a visual welcome screen alone
+cannot teach these to someone who cannot see or hear.
+
 ## Verification
 
 ```sh
@@ -97,11 +113,21 @@ bash scripts/test.sh
 The standalone Swift test runner works without full Xcode/XCTest. It checks known
 Morse vectors and gap timing; normalization and unsupported text; provider headers,
 image payloads and secret placement; error/truncation handling; both practice PDF
-pages, including OCR; and player navigation/reset. It makes no live API calls.
+pages, including OCR; playback cancellation; line/page boundaries; modal guards;
+click sequences; and swipe direction/momentum. It makes no live API calls and
+injects a silent haptic output for playback tests.
 
-Run `dist/Luma Touch.app/Contents/MacOS/LumaTouch --verify-ui` from this project
-directory to capture the app's own reader/practice/provider views into the ignored
+For an optional foreground pointer-lifecycle check, run
+`bash scripts/test-pointer.sh --run-capture`. It briefly captures the pointer and
+checks Escape, key-window changes, window movement and app deactivation, with a
+12-second cleanup watchdog. Without `--run-capture`, it only builds and prints
+instructions; it does not capture the pointer.
+
+Run `"dist/Luma Touch.app/Contents/MacOS/LumaTouch" --verify-ui` from this project
+directory to capture the app's own welcome/touch/reader/practice/provider views into the ignored
 `verification/` folder. This does not capture other applications or send requests.
+It briefly tests touch-mode pointer capture, restores the pointer, and leaves the
+welcome screen open.
 
 `scripts/make_practice_pdfs.py` regenerates the original practice PDFs using
 ReportLab and pypdfium2. Generated PDFs are included, so Python is not needed to

@@ -6,6 +6,9 @@ mkdir -p .build
 # Apple's XCTest framework is supplied by full Xcode, absent on this Mac.
 swiftc -parse-as-library -swift-version 5 \
   Sources/LumaTouch/Morse.swift Sources/LumaTouch/AIClient.swift \
-  Sources/LumaTouch/PDFReader.swift Tests/LumaTouchTests/CoreTests.swift \
+  Sources/LumaTouch/PDFReader.swift Sources/LumaTouch/Workspace.swift \
+  Sources/LumaTouch/TouchControlSurface.swift \
+  Tests/LumaTouchTests/CoreTests.swift Tests/LumaTouchTests/ReaderControlTests.swift \
+  Tests/LumaTouchTests/TouchControlTests.swift \
   -o .build/core-tests
 .build/core-tests

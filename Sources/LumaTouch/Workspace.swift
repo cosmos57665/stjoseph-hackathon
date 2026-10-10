@@ -9,7 +9,13 @@ enum Screen: String, CaseIterable {
 }
 
 @MainActor final class Workspace: ObservableObject {
-    @Published var screen: Screen = .reader
+    @Published var screen: Screen = .reader {
+        didSet {
+            guard oldValue != screen else { return }
+            if screen != .reader { exitTouchMode() }
+            stopAll()
+        }
+    }
     @Published var provider: Provider = .gemini
     @Published var keys: [Provider: String] = [:]
     @Published var models: [Provider: String] = [:]
@@ -18,27 +24,41 @@ enum Screen: String, CaseIterable {
     @Published var testing: Set<Provider> = []
     @Published var pages: [LessonPage] = []
     @Published var selectedPage = 0
+    @Published var selectedLine = 0
+    @Published var touchMode = false
+    @Published var showTouchWelcome = true { didSet { if showTouchWelcome { stopAll() } } }
+    @Published var showControls = false { didSet { if showControls { exitTouchMode(); stopAll() } } }
     @Published var title = "A little curiosity. A new connection."
     @Published var documentURL: URL?
-    @Published var busy = false
+    @Published var busy = false {
+        didSet {
+            if busy {
+                if touchMode { exitTouchMode() }
+                stopAll()
+            }
+        }
+    }
     @Published var activity = ""
-    @Published var error: String?
-    @Published var showPDF = false
+    @Published var error: String? { didSet { if error != nil { exitTouchMode(); stopAll() } } }
+    @Published var showPDF = false { didSet { if showPDF { exitTouchMode(); stopAll() } } }
     @Published var showSimplified = false
     @Published var draft = ""
-    @Published var showTextEntry = false
+    @Published var showTextEntry = false { didSet { if showTextEntry { exitTouchMode(); stopAll() } } }
     @Published var textSize: Double = 19
     @Published var dark = false
     @Published var solid = false
     @Published var aiProgress: Double = 0
     @Published var speaking = false
-    let player = HapticPlayer()
-    let practicePlayer = HapticPlayer()
+    let player: HapticPlayer
+    let practicePlayer: HapticPlayer
     private let speaker = AVSpeechSynthesizer()
     private var aiTask: Task<Void, Never>?
     private var operation = UUID()
 
-    init() {
+    init(loadPreferences: Bool = true, player: HapticPlayer? = nil, practicePlayer: HapticPlayer? = nil) {
+        self.player = player ?? HapticPlayer()
+        self.practicePlayer = practicePlayer ?? HapticPlayer()
+        guard loadPreferences else { return }
         // Keys are read only when the user previously explicitly chose to save them.
         for p in Provider.allCases {
             models[p] = UserDefaults.standard.string(forKey: "model.\(p.rawValue)") ?? p.defaultModel
@@ -51,12 +71,13 @@ enum Screen: String, CaseIterable {
     var visibleText: String { showSimplified ? (page?.simplified ?? page?.text ?? "") : (page?.text ?? "") }
     var wordCount: Int { visibleText.split(whereSeparator: { $0.isWhitespace }).count }
     var activeKey: Bool { !(keys[provider] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    var sentences: [String] {
-        visibleText.components(separatedBy: .newlines).flatMap { paragraph -> [String] in
-            let words = paragraph.split(whereSeparator: { $0.isWhitespace })
-            return stride(from: 0, to: words.count, by: 12).map { start in words[start..<min(start + 12, words.count)].joined(separator: " ") }
-        }.filter { !$0.isEmpty }
+    static func lines(in text: String) -> [String] {
+        text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
     }
+    var readingLines: [String] { Self.lines(in: visibleText) }
+    var currentLine: String { readingLines.indices.contains(selectedLine) ? readingLines[selectedLine] : "" }
+    var lineLabel: String { readingLines.isEmpty ? "No readable lines" : "Page \(selectedPage + 1) · Line \(selectedLine + 1) of \(readingLines.count)" }
+    var readingControlsAvailable: Bool { screen == .reader && !busy && !showPDF && !showTextEntry && !showControls && error == nil && !showTouchWelcome }
 
     func configuration(for provider: Provider? = nil) -> AIConfiguration {
         let p = provider ?? self.provider
@@ -99,6 +120,7 @@ enum Screen: String, CaseIterable {
 
     func importPDF() {
         guard !busy else { return }
+        exitTouchMode()
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.pdf]
         panel.allowsMultipleSelection = false
@@ -171,7 +193,122 @@ enum Screen: String, CaseIterable {
         syncPlayer()
     }
 
-    func syncPlayer() { player.load(sentences.first ?? visibleText) }
+    func syncPlayer(resetLine: Bool = true) {
+        if resetLine { selectedLine = 0 }
+        selectedLine = min(max(0, selectedLine), max(0, readingLines.count - 1))
+        player.load(currentLine)
+    }
+
+    func enterTouchMode() {
+        guard !busy, !showPDF, !showTextEntry, error == nil else { return }
+        stopAll()
+        showTouchWelcome = false
+        showControls = false
+        screen = .reader
+        touchMode = true
+        player.status = "Touch-only mode ready. Double-click to start. Escape releases the pointer."
+        player.cue(.ready)
+    }
+
+    func exitTouchMode() {
+        let wasReading = touchMode
+        showTouchWelcome = false
+        touchMode = false
+        if wasReading { pauseReading(); practicePlayer.stop() }
+    }
+
+    func toggleReading() {
+        guard readingControlsAvailable else { return }
+        practicePlayer.stop()
+        speaker.stopSpeaking(at: .immediate)
+        speaking = false
+        if player.isPlaying { pauseReading() }
+        else {
+            guard !player.symbols.isEmpty else { unavailableLine(); return }
+            player.cue(.ready)
+            player.play()
+        }
+    }
+
+    func pauseReading() {
+        speaker.stopSpeaking(at: .immediate)
+        speaking = false
+        player.pause()
+        player.cue(.paused)
+    }
+
+    func replayLine() {
+        guard readingControlsAvailable else { return }
+        stopAll()
+        player.load(currentLine)
+        guard !player.symbols.isEmpty else { unavailableLine(); return }
+        player.cue(.ready)
+        player.play()
+    }
+
+    func selectLine(_ index: Int, autoplay: Bool = false) {
+        guard readingControlsAvailable, readingLines.indices.contains(index) else { return }
+        stopAll()
+        selectedLine = index
+        player.load(currentLine)
+        if autoplay {
+            guard !player.symbols.isEmpty else { unavailableLine(); return }
+            player.cue(.ready)
+            player.play()
+        }
+    }
+
+    @discardableResult func moveLine(_ direction: Int) -> Bool {
+        guard readingControlsAvailable, direction != 0, !pages.isEmpty else { return false }
+        let step = direction > 0 ? 1 : -1
+        let next = selectedLine + step
+        if readingLines.indices.contains(next) {
+            selectLine(next, autoplay: true)
+            return true
+        }
+        var pageIndex = selectedPage + step
+        while pages.indices.contains(pageIndex) {
+            let lines = Self.lines(in: pages[pageIndex].text)
+            if !lines.isEmpty {
+                stopAll()
+                selectedPage = pageIndex
+                showSimplified = false
+                selectedLine = step > 0 ? 0 : lines.count - 1
+                syncPlayer(resetLine: false)
+                if player.symbols.isEmpty { unavailableLine() }
+                else { player.cue(.ready); player.play() }
+                return true
+            }
+            pageIndex += step
+        }
+        player.pause()
+        player.status = step > 0 ? "End of document. Swipe right to go back, or replay this line." : "Start of document. Swipe left for the next line."
+        player.cue(.boundary)
+        return false
+    }
+
+    func changeSpeed(_ direction: Int) {
+        guard readingControlsAvailable, direction != 0 else { return }
+        let wasPlaying = player.isPlaying
+        let updated = min(0.45, max(0.12, player.unit - (direction > 0 ? 0.03 : -0.03)))
+        guard abs(updated - player.unit) > 0.0001 else {
+            player.stop()
+            player.status = direction > 0 ? "Already at the fastest speed. Double-click to continue." : "Already at the slowest speed. Double-click to continue."
+            player.cue(.boundary)
+            return
+        }
+        player.pause()
+        player.unit = updated
+        player.status = direction > 0 ? "Faster. Current letter repeats when playback continues." : "Slower. Current letter repeats when playback continues."
+        player.cue(.ready)
+        if wasPlaying { player.play() }
+    }
+
+    private func unavailableLine() {
+        player.status = "This line has no supported Morse characters. Swipe to another line or press Escape."
+        player.cue(.boundary)
+    }
+
     func stopAll() { player.stop(); practicePlayer.stop(); speaker.stopSpeaking(at: .immediate); speaking = false }
 
     func speak() {

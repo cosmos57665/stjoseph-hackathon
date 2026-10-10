@@ -20,12 +20,17 @@ import SwiftUI
         .commands {
             CommandGroup(replacing: .newItem) { Button("Import PDF…", action: model.importPDF).keyboardShortcut("o", modifiers: .command).disabled(model.busy) }
             CommandMenu("Playback") {
-                Button("Play / Pause") { model.player.isPlaying ? model.player.pause() : model.player.play() }.keyboardShortcut("p", modifiers: [.command])
+                Button("Enter touch mode", action: model.enterTouchMode).keyboardShortcut("t", modifiers: [.command, .shift]).disabled(model.busy || model.showTextEntry || model.showPDF || model.error != nil)
+                Button("Exit touch mode", action: model.exitTouchMode).keyboardShortcut(.escape, modifiers: []).disabled(!model.touchMode && !model.showTouchWelcome)
+                Button("Play / Pause", action: model.toggleReading).keyboardShortcut("p", modifiers: [.command]).disabled(!model.readingControlsAvailable)
                 Button("Stop all playback") { model.stopAll() }.keyboardShortcut(".", modifiers: [.command])
-                Button("Previous word") { model.player.skipWord(-1) }.keyboardShortcut(.leftArrow, modifiers: [.command, .option])
-                Button("Next word") { model.player.skipWord(1) }.keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                Button("Previous line") { model.moveLine(-1) }.keyboardShortcut(.leftArrow, modifiers: [.command, .option]).disabled(!model.readingControlsAvailable)
+                Button("Next line") { model.moveLine(1) }.keyboardShortcut(.rightArrow, modifiers: [.command, .option]).disabled(!model.readingControlsAvailable)
             }
-            CommandGroup(replacing: .help) { Button("Morse reference sheet", action: model.openReference) }
+            CommandGroup(replacing: .help) {
+                Button("Touch controls guide") { model.showControls = true }
+                Button("Morse reference sheet", action: model.openReference)
+            }
         }
     }
 
@@ -47,7 +52,42 @@ import SwiftUI
                 try? process.run()
                 process.waitUntilExit()
             }
+            @MainActor func click(_ count: Int) {
+                guard let window = NSApp.keyWindow, let content = window.contentView else { return }
+                let point = content.convert(NSPoint(x: content.bounds.midX, y: content.bounds.midY), to: nil)
+                for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                    if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                     windowNumber: window.windowNumber, context: nil, eventNumber: count, clickCount: count, pressure: 1) { window.sendEvent(event) }
+                }
+            }
+            @MainActor func key(_ code: UInt16, _ character: String) {
+                guard let window = NSApp.keyWindow,
+                      let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, characters: character, charactersIgnoringModifiers: character,
+                                                  isARepeat: false, keyCode: code) else { return }
+                window.sendEvent(event)
+            }
+            var checks: [String: Bool] = ["welcomeSurvivesImport": model.showTouchWelcome]
+            snapshot("touch-welcome")
+            click(1); click(2)
+            checks["twoClicksDoNotEnter"] = model.showTouchWelcome && !model.touchMode
+            click(3)
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            checks["tripleClickEnters"] = model.touchMode && !model.player.isPlaying
+            snapshot("touch-reader")
+            key(49, " ")
+            checks["spaceStarts"] = model.player.isPlaying
+            click(2)
+            checks["doubleClickPauses"] = !model.player.isPlaying
+            key(53, "\u{1b}")
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            checks["escapeExits"] = !model.touchMode && !model.showTouchWelcome && !model.player.isPlaying
             snapshot("reader")
+            model.showControls = true
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            snapshot("controls-guide")
+            model.showControls = false
+            try? await Task.sleep(nanoseconds: 300_000_000)
             model.screen = .practice
             try? await Task.sleep(nanoseconds: 700_000_000)
             snapshot("practice")
@@ -60,8 +100,9 @@ import SwiftUI
             model.dark = false
             model.screen = .reader
             let result: [String: Any] = ["pages": model.pages.count, "title": model.title, "morseSymbols": model.player.symbols.count,
-                                       "providers": Provider.allCases.map(\.rawValue), "networkRequests": 0]
+                                       "providers": Provider.allCases.map(\.rawValue), "networkRequests": 0, "touchChecks": checks]
             if let data = try? JSONSerialization.data(withJSONObject: result, options: .prettyPrinted) { try? data.write(to: dir.appendingPathComponent("ui-result.json")) }
+            model.showTouchWelcome = true
         }
     }
 }
@@ -72,6 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct ContentView: View {
     @ObservedObject var model: Workspace
+    @State private var pointer = PointerCapture()
+    @State private var centeredWelcome = false
     var body: some View {
         ZStack {
             Wallpaper()
@@ -96,7 +139,7 @@ struct ContentView: View {
                             } label: {
                                 HStack(spacing: 11) {
                                     Image(systemName: screen.icon).font(.system(size: 16)).frame(width: 21)
-                                    Text(screen.rawValue).font(.system(size: 13, weight: model.screen == screen ? .semibold : .regular))
+                                    Text(screen.rawValue).font(.system(size: 13, weight: model.screen == screen ? .semibold : .regular)).fixedSize()
                                     Spacer(minLength: 0)
                                 }.padding(.horizontal, 12).padding(.vertical, 13)
                                     .background(.white.opacity(model.screen == screen ? 0.40 : 0), in: RoundedRectangle(cornerRadius: 13))
@@ -115,7 +158,7 @@ struct ContentView: View {
                                 Text(model.activeKey ? "\(model.provider.rawValue) key ready" : "Offline mode").font(.system(size: 11))
                             }.padding(10)
                         }.buttonStyle(.plain)
-                    }.padding(18).frame(width: 180)
+                    }.padding(16).frame(width: 184)
                     Rectangle().fill(.white.opacity(0.4)).frame(width: 1)
                     Group {
                         switch model.screen {
@@ -132,8 +175,43 @@ struct ContentView: View {
                     Rectangle().fill(.primary.opacity(0.12)).frame(width: 1, height: 31).padding(.horizontal, 5)
                     DockButton(icon: "doc.text", title: "Morse sheet", selected: false, action: model.openReference)
                 }.padding(7).glass(24, solid: model.solid).padding(.vertical, 18)
+            }.disabled(model.touchMode || model.showTouchWelcome)
+                .allowsHitTesting(!model.touchMode && !model.showTouchWelcome)
+                .accessibilityHidden(model.touchMode || model.showTouchWelcome)
+            if model.touchMode || model.showTouchWelcome {
+                TouchReadingView(model: model, player: model.player, onCommand: handleTouchCommand)
             }
         }.tint(Color.ocean)
+            .onAppear {
+                pointer.onInterruption = { model.exitTouchMode(); model.stopAll() }
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    if !centeredWelcome, model.showTouchWelcome, let window = NSApp.keyWindow {
+                        centeredWelcome = pointer.centerPointer(in: window)
+                    }
+                }
+            }
+            .onChange(of: model.touchMode) { _, active in
+                if active {
+                    guard let window = NSApp.keyWindow, pointer.capture(in: window) else {
+                        model.exitTouchMode()
+                        model.error = pointer.failureMessage ?? "Activate the reading window and try touch mode again."
+                        return
+                    }
+                } else { pointer.release() }
+                if CommandLine.arguments.contains("--verify-ui") {
+                    let line = "\(active ? "enter" : "exit"): captured=\(pointer.isCaptured)\n"
+                    let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("verification/pointer-capture.txt")
+                    let previous = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+                    try? (previous + line).write(to: url, atomically: true, encoding: .utf8)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
+                pointer.release()
+                if model.touchMode { model.exitTouchMode() }
+                model.stopAll()
+            }
+            .onDisappear { pointer.release(); model.stopAll() }
             .alert("Something needs attention", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
                 Button("OK") { model.error = nil }
             } message: { Text(model.error ?? "") }
@@ -151,5 +229,20 @@ struct ContentView: View {
                     HStack { Button("Cancel") { model.showTextEntry = false }; Spacer(); Button("Open in reader", action: model.useText).buttonStyle(ActionStyle(prominent: true)).disabled(model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
                 }.padding(30).frame(width: 630)
             }
+            .sheet(isPresented: $model.showControls) { ControlsGuideView() }
+    }
+
+    private func handleTouchCommand(_ command: TouchCommand) {
+        switch command {
+        case .enterTouchMode: model.enterTouchMode()
+        case .exitTouchMode: pointer.release(); model.exitTouchMode()
+        case .togglePlayback: model.toggleReading()
+        case .nextLine: model.moveLine(1)
+        case .previousLine: model.moveLine(-1)
+        case .replayLine: model.replayLine()
+        case .faster: model.changeSpeed(1)
+        case .slower: model.changeSpeed(-1)
+        case .pause: model.pauseReading()
+        }
     }
 }

@@ -69,6 +69,35 @@ enum Morse {
     @Published var status = "Rest a finger lightly on the trackpad."
     private var task: Task<Void, Never>?
     private var generation = UUID()
+    private var cueTask: Task<Void, Never>?
+    private let output: (NSHapticFeedbackManager.FeedbackPattern) -> Void
+    private let startupDelay: Double
+
+    init(startupDelay: Double = 1.2,
+         output: @escaping (NSHapticFeedbackManager.FeedbackPattern) -> Void = {
+             NSHapticFeedbackManager.defaultPerformer.perform($0, performanceTime: .now)
+         }) {
+        self.startupDelay = startupDelay
+        self.output = output
+    }
+
+    enum Cue { case ready, paused, boundary }
+
+    func cue(_ cue: Cue) {
+        cueTask?.cancel()
+        let count = cue == .ready ? 1 : cue == .paused ? 2 : 3
+        let delay = cue == .boundary ? 0.25 : 0.16
+        let pattern: NSHapticFeedbackManager.FeedbackPattern = cue == .boundary ? .levelChange : .alignment
+        // Feedback is separate from the Morse stream; play() leaves a lead-in.
+        output(pattern)
+        guard count > 1 else { return }
+        cueTask = Task {
+            for _ in 1..<count {
+                do { try await sleep(delay); try Task.checkCancellation(); output(pattern) }
+                catch { return }
+            }
+        }
+    }
 
     var current: MorseSymbol? { symbols.indices.contains(index) ? symbols[index] : nil }
     var progress: Double { symbols.isEmpty ? 0 : Double(index) / Double(symbols.count) }
@@ -85,6 +114,8 @@ enum Morse {
         generation = UUID()
         task?.cancel()
         task = nil
+        cueTask?.cancel()
+        cueTask = nil
         isPlaying = false
         isPulsing = false
         markIndex = -1
@@ -113,7 +144,7 @@ enum Morse {
         status = "Starting in a moment. Place a finger on the trackpad."
         task = Task {
             do {
-                try await sleep(1.2)
+                try await sleep(startupDelay)
                 while index < symbols.count {
                     try Task.checkCancellation()
                     let symbol = symbols[index]
@@ -133,7 +164,7 @@ enum Morse {
                 }
                 guard generation == token else { return }
                 isPlaying = false
-                status = "Finished. Replay whenever you like."
+                status = "Line finished. Swipe left for the next line, or double-click to replay."
             } catch {
                 // Cancellation intentionally leaves the current letter selected.
                 guard generation == token else { return }
@@ -152,7 +183,7 @@ enum Morse {
         let count = dash ? max(3, Int(length / 0.07)) : 1
         for _ in 0..<count {
             try Task.checkCancellation()
-            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+            output(.generic)
             try await sleep(length / Double(count))
         }
         isPulsing = false

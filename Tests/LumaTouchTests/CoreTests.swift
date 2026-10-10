@@ -110,7 +110,7 @@ func expectThrows<T>(_ expression: @autoclosure () throws -> T, file: StaticStri
     catch { handler(error) }
 }
 @main struct TestRunner {
-    @MainActor static func main() throws {
+    @MainActor static func main() async throws {
         let suite = CoreTests()
         suite.testKnownMorseAndSpacing()
         suite.testNormalizationAndUnrepresentableText()
@@ -119,6 +119,8 @@ func expectThrows<T>(_ expression: @autoclosure () throws -> T, file: StaticStri
         try suite.testProviderResponsesAndErrors()
         try suite.testPracticePDFTextAndScan()
         suite.testPlayerNavigationAndReset()
-        print("PASS: \(checks) assertions across 7 test groups. No live API calls or haptic output.")
+        await ReaderControlTests().run()
+        TouchControlTests().run()
+        print("PASS: \(checks) assertions covering Morse, PDF/OCR, provider requests, reader playback, line navigation and touch controls. No live API calls or haptic output.")
     }
 }
