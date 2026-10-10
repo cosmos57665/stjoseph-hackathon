@@ -49,7 +49,9 @@ import AppKit
         model.send(config: config)
         try await Task.sleep(nanoseconds: 40_000_000)
         expectEqual(questions, 1); expectEqual(model.phase, .answer)
-        model.newQuestion(); expectFalse(model.handwriting.hasInk); expectNil(model.recognizedText)
+        expectEqual(model.messages.count, 2); expectEqual(model.messages[0].text, "H")
+        expectTrue(model.messages[0].isUser); expectFalse(model.messages[1].isUser)
+        model.newQuestion(); expectEqual(model.messages.count, 2); expectFalse(model.handwriting.hasInk); expectNil(model.recognizedText)
         model.addStroke(stroke); model.send(config: config); model.suspend()
         try await Task.sleep(nanoseconds: 60_000_000)
         expectEqual(model.phase, .composing); expectNil(model.recognizedText); expectTrue(model.handwriting.hasInk)
@@ -68,6 +70,9 @@ import AppKit
         let workspace = Workspace(loadPreferences: false, assistant: model)
         workspace.enterHandwritingMode(); expectTrue(workspace.askMode); expectTrue(workspace.touchMode)
         workspace.exitTouchMode(); expectFalse(workspace.askMode); expectFalse(workspace.touchMode)
+        model.clearConversation()
+        expectTrue(model.messages.isEmpty); expectFalse(model.handwriting.hasInk)
+        expectNil(model.recognizedText); expectEqual(model.phase, .composing)
         model.suspend(); failed.suspend(); uncertain.suspend()
     }
 }

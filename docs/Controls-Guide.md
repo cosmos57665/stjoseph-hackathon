@@ -218,3 +218,19 @@ review. Handwriting recognition and physical gestures need real-user testing.
 
 Print-on-palm background: https://www.helenkeller.org/resources/print-on-palm-pop/
 Helen Keller's tactile manual alphabet: https://www.afb.org/about-afb/history/online-museums/anne-sullivan-miracle-worker/formative-years/manual-alphabet
+
+## Communication chat (0.5)
+
+Write to communicate now shows a conversation with user and AI message bubbles,
+plus the handwriting composer below it. First click/Return transcribes; review the
+text, then click/Return again to send. While waiting, the submitted message and a
+thinking indicator appear. Failed requests keep the draft for retry and do not add
+a duplicate completed exchange. Replies remain visible when writing a follow-up.
+
+After a reply, triple-click or press A to write the next message. Double-click still
+plays/pauses tactile reading, and swipes navigate reply lines. Fn–Up/Fn–Down
+(Page Up/Page Down) browse message history with the pointer captured.
+Command–Shift–N starts a new chat and clears messages, drafts and AI context,
+cancelling any pending request. History remains in this app session only. All
+completed exchanges are displayed; only the last two exchanges are sent as AI
+conversation context, alongside relevant current PDF excerpts.

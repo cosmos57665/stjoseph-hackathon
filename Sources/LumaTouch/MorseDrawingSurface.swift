@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 enum DrawingCommand: Equatable {
+    case previousMessage, nextMessage
     case dot, dash, finishLetter, space, undo, review, send, returnToPDF, exit
     case toggleAnswer, nextAnswer, previousAnswer, faster, slower, replayAnswer, newQuestion
 }
@@ -190,6 +191,8 @@ final class MorseDrawingNSView: NSView {
 
     override func keyDown(with event: NSEvent) {
         guard !event.isARepeat, event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { super.keyDown(with: event); return }
+        if handwriting && event.keyCode == 116 { onCommand?(.previousMessage); return }
+        if handwriting && event.keyCode == 121 { onCommand?(.nextMessage); return }
         if event.keyCode == 53 { onCommand?(.exit); return }
         if phase == .composing {
             switch event.keyCode {

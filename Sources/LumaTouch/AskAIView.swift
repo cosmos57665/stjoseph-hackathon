@@ -5,6 +5,7 @@ struct AskAIView: View {
     @ObservedObject var assistant: AskAIModel
     @ObservedObject var player: HapticPlayer
     let onExit: () -> Void
+    @State private var historyIndex = 0
 
     var body: some View {
         ZStack {
@@ -18,7 +19,7 @@ struct AskAIView: View {
                 }
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(assistant.phase == .answer ? "A little clarity." : assistant.handwritingMode ? "Write it. Share your words." : "A question, in your own touch.")
+                        Text(assistant.handwritingMode ? "Chat, in your own handwriting." : assistant.phase == .answer ? "A little clarity." : "A question, in your own touch.")
                             .font(.system(size: 33, weight: .medium)).tracking(-1)
                         Text("\(model.title)  ·  Page \(model.selectedPage + 1)  ·  Line \(model.selectedLine + 1)")
                             .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
@@ -27,8 +28,8 @@ struct AskAIView: View {
                     Label(model.provider.rawValue, systemImage: model.provider.symbol).font(.system(size: 12, weight: .semibold))
                         .padding(12).glass(14, solid: model.solid)
                 }
-                if assistant.phase == .answer { answerContent }
-                else if assistant.handwritingMode { handwritingContent }
+                if assistant.handwritingMode { chatContent }
+                else if assistant.phase == .answer { answerContent }
                 else { composeContent }
                 Spacer(minLength: 0)
                 gestureGuide
@@ -44,39 +45,97 @@ struct AskAIView: View {
         }
     }
 
-    private var handwritingContent: some View {
-        HStack(alignment: .top, spacing: 20) {
-            VStack(alignment: .leading, spacing: 14) {
-                Eyebrow(text: "Print one letter at a time")
-                Canvas { context, size in
-                    let scale = min(size.width, size.height / 0.7)
-                    let offset = (size.width - scale) / 2
-                    for stroke in assistant.handwriting.current + [assistant.stroke] {
-                        guard let first = stroke.first else { continue }
-                        var path = Path()
-                        path.move(to: CGPoint(x: offset + first.x * scale, y: size.height - first.y * scale))
-                        for p in stroke.dropFirst() { path.addLine(to: CGPoint(x: offset + p.x * scale, y: size.height - p.y * scale)) }
-                        if stroke.count == 1 { path.addEllipse(in: CGRect(x: offset + first.x * scale - 2, y: size.height - first.y * scale - 2, width: 4, height: 4)) }
-                        context.stroke(path, with: .color(.ocean), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+    private var chatContent: some View {
+        VStack(spacing: 14) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if assistant.messages.isEmpty && !assistant.awaitingReply {
+                            VStack(spacing: 10) {
+                                Image(systemName: "bubble.left.and.bubble.right").font(.system(size: 30)).foregroundStyle(Color.ocean)
+                                Text("What would you like to talk about?").font(.system(size: 22, weight: .medium))
+                                Text("Write a message below. Ask a question, talk through an idea, or explore your PDF.")
+                                    .font(.system(size: 13)).foregroundStyle(.secondary)
+                            }.frame(maxWidth: .infinity).padding(.vertical, 30)
+                        }
+                        ForEach(assistant.messages) { message in
+                            chatBubble(message.text, user: message.isUser).id(message.id)
+                        }
+                        if assistant.awaitingReply {
+                            chatBubble(assistant.submittedQuestion, user: true)
+                            HStack { ProgressView().controlSize(.small); Text("Thinking…").foregroundStyle(.secondary) }.padding(12)
+                        }
+                        Color.clear.frame(height: 1).id("latest")
+                    }.padding(18)
+                }
+                .onChange(of: historyIndex) { _, index in
+                    if assistant.messages.indices.contains(index) { proxy.scrollTo(assistant.messages[index].id, anchor: .top) }
+                }
+                .onChange(of: assistant.messages.count) { _, _ in historyIndex = max(0, assistant.messages.count - 1); proxy.scrollTo("latest", anchor: .bottom) }
+                .onChange(of: assistant.phase) { _, _ in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { proxy.scrollTo("latest", anchor: .bottom) }
+                }
+                .onChange(of: assistant.awaitingReply) { _, _ in proxy.scrollTo("latest", anchor: .bottom) }
+                .onAppear { proxy.scrollTo("latest", anchor: .bottom) }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity).glass(solid: model.solid)
+            if assistant.phase == .answer {
+                HStack(spacing: 18) {
+                    Image(systemName: "waveform").foregroundStyle(Color.ocean)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Reply · line \(assistant.answerLine + 1) of \(assistant.answerLines.count)").font(.caption.weight(.semibold))
+                        Text(assistant.currentAnswerLine).font(.system(size: 15)).lineLimit(2)
+                        Text("Double-click to feel the reply. Triple-click or press A to write your next message.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                }.frame(height: 230).background(.white.opacity(0.25), in: RoundedRectangle(cornerRadius: 16))
-                Text("\(assistant.handwriting.cells.count) saved · up to 64 letters and spaces")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ocean)
-                Text("Draw with one finger. Lift between strokes.\nSwipe right to save the letter and clear the pad.")
-                    .font(.system(size: 13)).foregroundStyle(.secondary).lineSpacing(4)
-            }.padding(22).glass(solid: model.solid).frame(maxWidth: .infinity)
-            VStack(alignment: .leading, spacing: 16) {
-                Eyebrow(text: "Your message")
-                Text(assistant.recognizedText ?? "Your handwriting becomes words here.")
-                    .font(.system(size: 27, weight: .medium, design: .rounded)).lineSpacing(6)
-                    .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
-                Divider()
-                if assistant.phase == .waiting { ProgressView("Reading your handwriting…") }
-                else { Label(assistant.recognizedText == nil ? "Click once to transcribe" : "Click again to ask AI", systemImage: "hand.tap").font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.ocean) }
-                Text(assistant.status).font(.system(size: 13)).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
-                Text("Recognition may be wrong. ? means an uncertain letter. Swipe down to review in Morse; swipe left to correct.")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
-            }.padding(22).glass(solid: model.solid).frame(maxWidth: .infinity)
+                    Spacer()
+                    Text("Write a reply  ↗").font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.ocean)
+                }.padding(18).glass(solid: model.solid)
+            } else {
+                HStack(alignment: .top, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("HANDWRITING PAD").font(.system(size: 10, weight: .bold)).tracking(1)
+                        Canvas { context, size in
+                            let scale = min(size.width, size.height / 0.7)
+                            let offset = (size.width - scale) / 2
+                            for stroke in assistant.handwriting.current + [assistant.stroke] {
+                                guard let first = stroke.first else { continue }
+                                var path = Path()
+                                path.move(to: CGPoint(x: offset + first.x * scale, y: size.height - first.y * scale))
+                                for p in stroke.dropFirst() { path.addLine(to: CGPoint(x: offset + p.x * scale, y: size.height - p.y * scale)) }
+                                if stroke.count == 1 { path.addEllipse(in: CGRect(x: offset + first.x * scale - 2, y: size.height - first.y * scale - 2, width: 4, height: 4)) }
+                                context.stroke(path, with: .color(.ocean), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                            }
+                        }.frame(width: 230, height: 120).background(.white.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+                        Text("\(assistant.handwriting.cells.count) saved · Swipe right after each letter").font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(assistant.recognizedText ?? "Write your message…")
+                            .font(.system(size: 21, weight: .medium)).foregroundStyle(assistant.recognizedText == nil ? Color.secondary : Color.primary)
+                            .frame(maxWidth: .infinity, minHeight: 45, alignment: .topLeading)
+                        Text(assistant.status).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(3)
+                        HStack {
+                            Text("? = uncertain · Swipe left to correct").font(.system(size: 10)).foregroundStyle(.secondary)
+                            Spacer()
+                            if assistant.phase == .waiting { ProgressView().controlSize(.small) }
+                            else { Label(assistant.recognizedText == nil ? "Click / Return to transcribe" : "Click / Return to send", systemImage: "arrow.up.circle.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.ocean) }
+                        }
+                    }
+                }.padding(18).glass(solid: model.solid)
+            }
+            Text("Fn ↑ / ↓: browse messages · AI remembers last two exchanges · ⌘⇧N: new chat")
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+        }
+    }
+
+    private func chatBubble(_ text: String, user: Bool) -> some View {
+        HStack(alignment: .top) {
+            if user { Spacer(minLength: 120) }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(user ? "YOU" : "LUMA · AI").font(.system(size: 9, weight: .bold)).tracking(1).foregroundStyle(user ? Color.white.opacity(0.8) : Color.ocean)
+                Text(text).font(.system(size: 16)).lineSpacing(5).fixedSize(horizontal: false, vertical: true)
+            }.padding(16).foregroundStyle(user ? Color.white : Color.primary)
+                .background(user ? Color.ocean : Color.white.opacity(0.35), in: RoundedRectangle(cornerRadius: 18))
+            if !user { Spacer(minLength: 100) }
         }
     }
 
@@ -172,6 +231,8 @@ struct AskAIView: View {
     }
     private func handle(_ command: DrawingCommand) {
         switch command {
+        case .previousMessage: historyIndex = max(0, historyIndex - 1)
+        case .nextMessage: historyIndex = min(max(0, assistant.messages.count - 1), historyIndex + 1)
         case .dot: assistant.add(.dot)
         case .dash: assistant.add(.dash)
         case .finishLetter: assistant.finishLetter()

@@ -46,6 +46,12 @@ enum QuestionPrompt {
     }
 }
 
+struct ChatMessage: Identifiable {
+    let id = UUID()
+    let isUser: Bool
+    let text: String
+}
+
 @MainActor final class AskAIModel: ObservableObject {
     enum Phase: String { case composing, waiting, answer }
     typealias Recognition = (AIConfiguration, Data) async throws -> String
@@ -71,6 +77,8 @@ enum QuestionPrompt {
     private var task: Task<Void, Never>?
     private var generation = UUID()
     private var history: [[String: String]] = []
+    @Published private(set) var messages: [ChatMessage] = []
+    @Published private(set) var awaitingReply = false
 
     init(player: HapticPlayer? = nil, isDemonstration: Bool = false, completion: Completion? = nil, recognition: Recognition? = nil) {
         self.recognition = recognition ?? { config, image in
@@ -89,7 +97,7 @@ enum QuestionPrompt {
     func prepare(_ context: LessonQuestionContext, handwritingMode: Bool = false) {
         suspend()
         if self.context?.documentID != context.documentID {
-            draft = MorseDraft(); handwriting = HandwritingDraft(); recognizedText = nil; answer = ""; submittedQuestion = ""; history = []; answerLine = 0
+            draft = MorseDraft(); handwriting = HandwritingDraft(); recognizedText = nil; answer = ""; submittedQuestion = ""; history = []; messages = []; answerLine = 0
         }
         self.handwritingMode = handwritingMode
         self.context = context
@@ -183,7 +191,7 @@ enum QuestionPrompt {
             }
             let prompt = try QuestionPrompt.payload(question: question, context: context, history: history)
             player.stop(); isReviewing = false
-            submittedQuestion = question; phase = .waiting; status = "Asking \(config.provider.rawValue)… Two-finger click returns to the PDF and cancels."
+            submittedQuestion = question; awaitingReply = true; phase = .waiting; status = "Asking \(config.provider.rawValue)… Two-finger click returns to the PDF and cancels."
             let token = UUID(); generation = token
             player.cue(.ready)
             task = Task {
@@ -191,6 +199,9 @@ enum QuestionPrompt {
                     let result = try await completion(config, prompt)
                     try Task.checkCancellation()
                     guard generation == token else { return }
+                    messages.append(ChatMessage(isUser: true, text: question))
+                    messages.append(ChatMessage(isUser: false, text: result))
+                    awaitingReply = false
                     answer = result; answerLine = 0; phase = .answer; draft = MorseDraft(); handwriting = HandwritingDraft(); recognizedText = nil; stroke = []; lastShape = nil
                     history.append(["question": question, "answer": String(result.prefix(3000))]); history = Array(history.suffix(2))
                     player.load(currentAnswerLine)
@@ -199,7 +210,7 @@ enum QuestionPrompt {
                     task = nil
                 } catch {
                     guard generation == token else { return }
-                    phase = .composing; task = nil
+                    phase = .composing; task = nil; awaitingReply = false
                     if error is CancellationError { status = "Cancelled. Your question is kept." }
                     else { feedbackError("Could not get an answer. Check Connections and retry; your question is kept.", tactile: "AI ERROR") }
                 }
@@ -230,6 +241,13 @@ enum QuestionPrompt {
                 }
             }
         } catch { feedbackError(error.localizedDescription) }
+    }
+
+    func clearConversation() {
+        suspend()
+        messages = []; history = []; draft = MorseDraft(); handwriting = HandwritingDraft()
+        recognizedText = nil; answer = ""; submittedQuestion = ""; answerLine = 0
+        phase = .composing; status = "New chat. Draw your first message."; player.cue(.ready)
     }
 
     func newQuestion() {
@@ -264,6 +282,7 @@ enum QuestionPrompt {
     }
 
     func suspend() {
+        awaitingReply = false
         generation = UUID(); task?.cancel(); task = nil; player.stop(); isReviewing = false; stroke = []
         if phase == .waiting { phase = .composing; status = "Cancelled. Your question is kept." }
     }

@@ -7,7 +7,7 @@ import SwiftUI
         let verifying = CommandLine.arguments.contains("--verify-ui")
         let assistant: AskAIModel? = verifying ? AskAIModel(player: HapticPlayer(output: { _ in }), isDemonstration: true, completion: { _, prompt in
             let data = try JSONSerialization.jsonObject(with: Data(prompt.utf8)) as! [String: Any]
-            precondition(data["learner_question"] as? String == "WHY")
+            precondition(["WHY", "HI"].contains(data["learner_question"] as? String ?? ""))
             precondition(data["document_excerpts"] != nil)
             try await Task.sleep(nanoseconds: 500_000_000)
             return "Demo reply. Your question is linked to the current PDF passage.\nThis response is simulated for testing, with no API request."
@@ -35,6 +35,7 @@ import SwiftUI
         .commands {
             CommandGroup(replacing: .newItem) { Button("Import PDF…", action: model.importPDF).keyboardShortcut("o", modifiers: .command).disabled(model.busy) }
             CommandMenu("Playback") {
+                Button("New communication chat") { model.assistant.clearConversation() }.keyboardShortcut("n", modifiers: [.command, .shift]).disabled(!model.askMode)
                 Button("Write to communicate", action: model.enterHandwritingMode).keyboardShortcut("h", modifiers: [.command, .shift])
                 Button("Ask AI about this PDF", action: model.enterAskMode).keyboardShortcut("a", modifiers: [.command, .shift]).disabled(!model.readingControlsAvailable || model.pages.isEmpty)
                 Button("Enter touch mode", action: model.enterTouchMode).keyboardShortcut("t", modifiers: [.command, .shift]).disabled(model.busy || model.showTextEntry || model.showPDF || model.error != nil)
@@ -155,6 +156,13 @@ import SwiftUI
             snapshot("handwriting-message")
             key(125, "")
             checks["handwritingReviewPlays"] = model.assistant.player.isPlaying
+            key(36, "\r")
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            checks["chatShowsExchange"] = model.assistant.messages.count == 4 && model.assistant.phase == .answer
+            snapshot("handwriting-chat")
+            key(0, "a")
+            checks["chatFollowupKeepsHistory"] = model.assistant.phase == .composing && model.assistant.messages.count == 4
+            snapshot("handwriting-followup")
             model.keys[model.provider] = ""
             key(53, "\u{1b}")
             try? await Task.sleep(nanoseconds: 300_000_000)

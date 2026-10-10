@@ -195,3 +195,11 @@ print-on-palm-inspired input, not tactile letter output. See the controls guide.
 `HandwritingPrompt` separates recognition instructions from image data and validates
 response shape. Recognition is injected in tests and UI verification; passing those
 checks does not establish real handwriting recognition accuracy or provider access.
+
+### Handwriting chat (0.5)
+
+Communication now uses a chat timeline with user and AI bubbles above the handwritten
+message composer. Transcribe, review, then send; triple-click or press A after a reply
+to write a follow-up. Fn–Up/Down browse the timeline and Command–Shift–N clears the
+chat and cancels a pending request. History is session-only; the last two completed
+exchanges are included in AI context. Existing Morse reply playback remains available.
