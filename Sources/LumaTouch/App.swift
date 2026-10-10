@@ -71,11 +71,11 @@ import SwiftUI
                 try? process.run()
                 process.waitUntilExit()
             }
-            @MainActor func click(_ count: Int) {
+            @MainActor func click(_ count: Int, at timestamp: TimeInterval? = nil) {
                 guard let window = NSApp.keyWindow, let content = window.contentView else { return }
                 let point = content.convert(NSPoint(x: content.bounds.midX, y: content.bounds.midY), to: nil)
                 for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-                    if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                    if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: timestamp ?? ProcessInfo.processInfo.systemUptime,
                                                      windowNumber: window.windowNumber, context: nil, eventNumber: count, clickCount: count, pressure: 1) { window.sendEvent(event) }
                 }
             }
@@ -88,9 +88,10 @@ import SwiftUI
             }
             var checks: [String: Bool] = ["welcomeSurvivesImport": model.showTouchWelcome]
             snapshot("touch-welcome")
-            click(1); click(2)
+            let startClickTime = ProcessInfo.processInfo.systemUptime
+            click(1, at: startClickTime); click(2, at: startClickTime + 0.4)
             checks["twoClicksDoNotEnter"] = model.showTouchWelcome && !model.touchMode
-            click(1)
+            click(1, at: startClickTime + 0.8)
             try? await Task.sleep(nanoseconds: 700_000_000)
             checks["tripleClickEnters"] = model.touchMode && !model.player.isPlaying
             snapshot("touch-reader")

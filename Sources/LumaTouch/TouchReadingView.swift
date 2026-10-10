@@ -53,12 +53,7 @@ struct TouchReadingView: View {
             TouchControlSurface(enabled: !model.busy, activationOnly: welcoming, focusOnAppear: true, allowsQuestionEntry: !welcoming,
                                 accessibilityValue: welcoming ? "Space or three clicks to enter touch mode" : "\(model.lineLabel). \(player.status)", onCommand: onCommand)
                 .id(welcoming)
-            if welcoming {
-                VStack {
-                    HStack { Spacer(); Button("Use standard controls  ↗") { onCommand(.exitTouchMode) }.buttonStyle(ActionStyle()) }
-                    Spacer()
-                }.padding(.top, 84).padding(.trailing, 42)
-            }
+
         }
     }
 

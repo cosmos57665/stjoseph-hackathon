@@ -152,7 +152,15 @@ final class TouchControlNSView: NSView {
     var inputEnabled = true {
         didSet {
             if !inputEnabled { interpreter.reset(); startClicks.reset() }
-            if oldValue != inputEnabled { needsDisplay = true }
+            if oldValue != inputEnabled {
+                needsDisplay = true
+                if inputEnabled && focusOnAppear {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, self.inputEnabled else { return }
+                        self.window?.makeFirstResponder(self)
+                    }
+                }
+            }
         }
     }
     private var interpreter = TouchGestureInterpreter()
