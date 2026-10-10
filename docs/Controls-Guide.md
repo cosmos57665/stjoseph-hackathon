@@ -253,3 +253,20 @@ These keyboard controls replace the earlier Space-to-finish-letter mapping for
 While waiting for AI, Space and arrows do not start another request. Morse input
 mode retains Space to finish a Morse letter and Return to send. PDF reading already
 supports Space play/pause and arrows for navigation/speed. Command–Shift–N clears chat.
+
+## Jump directly to a feature (0.5.2)
+
+| Shortcut | Opens and activates |
+| --- | --- |
+| Command–Up | PDF touch reading (Space starts playback) |
+| Command–Down | Handwriting chat, ready to draw |
+| Command–Right | Morse questions, ready for Morse input |
+| Command–Left | Morse practice screen |
+
+These appear in the Features menu and work between active modes. Switching stops
+playback and cancels a pending request, preserving its draft. Practice releases the
+pointer for its standard controls. Reading and Morse questions require a loaded
+lesson. Shortcuts leave the current mode unchanged during loading, text-entry dialogs, PDF previews,
+controls sheets and errors so they do not discard an in-progress edit. Plain arrows
+retain the current mode's controls. Activation does not automatically send data or
+start reading a long passage.

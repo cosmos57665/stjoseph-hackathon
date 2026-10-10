@@ -206,6 +206,30 @@ enum Screen: String, CaseIterable {
         player.load(currentLine)
     }
 
+    enum Feature { case reading, handwriting, morse, practice }
+    var canActivateFeature: Bool { !busy && !showPDF && !showTextEntry && !showControls && error == nil }
+
+    func activate(_ feature: Feature) {
+        guard canActivateFeature else { return }
+        if (feature == .reading || feature == .morse) && pages.isEmpty {
+            player.cue(.boundary)
+            return
+        }
+        exitTouchMode()
+        stopAll()
+        switch feature {
+        case .reading: enterTouchMode()
+        case .handwriting: enterHandwritingMode()
+        case .morse:
+            screen = .reader
+            enterAskMode()
+        case .practice:
+            screen = .practice
+            practicePlayer.load("E")
+            practicePlayer.cue(.ready)
+        }
+    }
+
     func enterTouchMode() {
         guard !busy, !showPDF, !showTextEntry, error == nil else { return }
         stopAll()

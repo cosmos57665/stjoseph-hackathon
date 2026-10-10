@@ -87,6 +87,17 @@ import AppKit
         let workspace = Workspace(loadPreferences: false, assistant: model)
         workspace.enterHandwritingMode(); expectTrue(workspace.askMode); expectTrue(workspace.touchMode)
         workspace.exitTouchMode(); expectFalse(workspace.askMode); expectFalse(workspace.touchMode)
+        workspace.pages = [LessonPage(id: 0, source: "HI", extraction: "Test")]
+        workspace.syncPlayer()
+        workspace.activate(.reading); expectTrue(workspace.touchMode); expectFalse(workspace.askMode)
+        workspace.activate(.handwriting); expectTrue(workspace.askMode); expectTrue(model.handwritingMode)
+        workspace.activate(.morse); expectTrue(workspace.askMode); expectFalse(model.handwritingMode)
+        workspace.activate(.practice); expectEqual(workspace.screen, .practice); expectFalse(workspace.touchMode)
+        workspace.showTextEntry = true
+        workspace.activate(.handwriting); expectFalse(workspace.askMode)
+        workspace.showTextEntry = false
+        workspace.activate(.handwriting); expectTrue(workspace.askMode)
+        workspace.exitTouchMode()
         model.clearConversation()
         expectTrue(model.messages.isEmpty); expectFalse(model.handwriting.hasInk)
         expectNil(model.recognizedText); expectEqual(model.phase, .composing)

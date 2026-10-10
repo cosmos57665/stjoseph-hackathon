@@ -122,7 +122,7 @@ struct AskAIView: View {
                     }
                 }.padding(18).glass(solid: model.solid)
             }
-            Text("Fn ↑ / ↓: browse messages · AI remembers last two exchanges · ⌘⇧N: new chat")
+            Text("⌘↑ Read · ⌘↓ Handwriting · ⌘→ Morse · ⌘← Practice · ⌘⇧N New chat")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
         }
     }

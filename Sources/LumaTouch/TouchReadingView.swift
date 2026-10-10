@@ -107,6 +107,7 @@ struct ControlsGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack { Text("Every control, in one place.").font(.title2.weight(.medium)); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }
+            Text("⌘↑ PDF reading  ·  ⌘↓ Handwriting chat  ·  ⌘→ Morse questions  ·  ⌘← Practice").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ocean)
             Picker("Controls for", selection: $section) { Text("Reading").tag(0); Text("Morse questions").tag(1); Text("Handwriting").tag(2) }.pickerStyle(.segmented)
             Text(writing ? "The pointer stays fixed. Print one letter at a time, with as many strokes as needed. No Morse input is required." : asking ? "The pointer stays fixed. A light tap enters a dot; a physical click sends. Swipe to separate letters at your own pace." : "In touch mode, the whole trackpad controls your lesson. A single click does nothing; there is no small button to find.")
                 .foregroundStyle(.secondary)

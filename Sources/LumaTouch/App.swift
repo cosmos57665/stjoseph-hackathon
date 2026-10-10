@@ -34,6 +34,7 @@ import SwiftUI
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) { Button("Import PDF…", action: model.importPDF).keyboardShortcut("o", modifiers: .command).disabled(model.busy) }
+            FeatureCommands(model: model)
             CommandMenu("Playback") {
                 Button("New communication chat") { model.assistant.clearConversation() }.keyboardShortcut("n", modifiers: [.command, .shift]).disabled(!model.askMode)
                 Button("Write to communicate", action: model.enterHandwritingMode).keyboardShortcut("h", modifiers: [.command, .shift])
@@ -167,6 +168,36 @@ import SwiftUI
             key(53, "\u{1b}")
             try? await Task.sleep(nanoseconds: 300_000_000)
             checks["handwritingEscapeReleases"] = !model.touchMode && !model.askMode
+            @MainActor func commandArrow(_ code: UInt16, _ scalar: UInt32) {
+                let character = String(UnicodeScalar(scalar)!)
+                let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command], timestamp: ProcessInfo.processInfo.systemUptime,
+                                            windowNumber: NSApp.keyWindow?.windowNumber ?? 0, context: nil, characters: character,
+                                            charactersIgnoringModifiers: character, isARepeat: false, keyCode: code)!
+                let handled = NSApp.mainMenu?.performKeyEquivalent(with: event) ?? false
+                var lines = ["code=\(code) handled=\(handled) pages=\(model.pages.count) can=\(model.canActivateFeature) touch=\(model.touchMode) ask=\(model.askMode)"]
+                func scan(_ menu: NSMenu) {
+                    for item in menu.items {
+                        if item.title.contains("Activate") || item.title.contains("practice") { lines.append("\(item.title) enabled=\(item.isEnabled) key=\(item.keyEquivalent.unicodeScalars.map { $0.value }) flags=\(item.keyEquivalentModifierMask.rawValue)") }
+                        if let sub = item.submenu { scan(sub) }
+                    }
+                }
+                if let menu = NSApp.mainMenu { scan(menu) }
+                try? lines.joined(separator: "\n").write(to: dir.appendingPathComponent("shortcut-\(code).txt"), atomically: true, encoding: .utf8)
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            commandArrow(126, 0xF700)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            checks["commandUpActivatesReading"] = model.touchMode && !model.askMode
+            commandArrow(125, 0xF701)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            checks["commandDownActivatesHandwriting"] = model.askMode && model.assistant.handwritingMode
+            commandArrow(124, 0xF703)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            checks["commandRightActivatesMorse"] = model.askMode && !model.assistant.handwritingMode
+            commandArrow(123, 0xF702)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            checks["commandLeftOpensPractice"] = model.screen == .practice && !model.touchMode && !model.askMode
+            model.screen = .reader
             model.showControls = true
             try? await Task.sleep(nanoseconds: 500_000_000)
             snapshot("controls-guide")
@@ -189,6 +220,18 @@ import SwiftUI
             model.stopAll()
             NSApp.terminate(nil)
         }
+    }
+}
+
+struct FeatureCommands: Commands {
+    @ObservedObject var model: Workspace
+    var body: some Commands {
+            CommandMenu("Features") {
+                Button("Activate PDF reading") { model.activate(.reading) }.keyboardShortcut(.upArrow, modifiers: .command)
+                Button("Activate handwriting chat") { model.activate(.handwriting) }.keyboardShortcut(.downArrow, modifiers: .command)
+                Button("Activate Morse questions") { model.activate(.morse) }.keyboardShortcut(.rightArrow, modifiers: .command)
+                Button("Open Morse practice") { model.activate(.practice) }.keyboardShortcut(.leftArrow, modifiers: .command)
+            }
     }
 }
 
