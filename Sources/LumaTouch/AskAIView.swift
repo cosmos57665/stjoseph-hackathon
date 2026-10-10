@@ -13,12 +13,12 @@ struct AskAIView: View {
                 HStack {
                     Label("luma touch", systemImage: "waveform.path").font(.system(size: 20, weight: .semibold, design: .rounded)).foregroundStyle(Color.ocean)
                     Spacer()
-                    Text(assistant.isDemonstration ? "OFFLINE DEMO · NO API CALLS" : assistant.phase == .answer ? "AI REPLY" : "DRAW TO ASK")
+                    Text(assistant.isDemonstration ? "OFFLINE DEMO · NO API CALLS" : assistant.phase == .answer ? "AI REPLY" : assistant.handwritingMode ? "WRITE TO COMMUNICATE" : "DRAW TO ASK")
                         .font(.system(size: 10, weight: .bold)).tracking(2)
                 }
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(assistant.phase == .answer ? "A little clarity." : "A question, in your own touch.")
+                        Text(assistant.phase == .answer ? "A little clarity." : assistant.handwritingMode ? "Write it. Share your words." : "A question, in your own touch.")
                             .font(.system(size: 33, weight: .medium)).tracking(-1)
                         Text("\(model.title)  ·  Page \(model.selectedPage + 1)  ·  Line \(model.selectedLine + 1)")
                             .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
@@ -28,6 +28,7 @@ struct AskAIView: View {
                         .padding(12).glass(14, solid: model.solid)
                 }
                 if assistant.phase == .answer { answerContent }
+                else if assistant.handwritingMode { handwritingContent }
                 else { composeContent }
                 Spacer(minLength: 0)
                 gestureGuide
@@ -35,11 +36,47 @@ struct AskAIView: View {
                     .font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity)
                 Text(assistant.phase == .answer
                      ? "AI can make mistakes. Check the explanation against your PDF."
-                     : "One click sends your question, recent conversation and relevant extracted PDF text to \(model.provider.rawValue).")
+                     : assistant.handwritingMode ? "First click sends only your drawing for transcription. A second click sends the recognized message and PDF context to AI." : "One click sends your question, recent conversation and relevant extracted PDF text to \(model.provider.rawValue).")
                     .font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: .infinity)
             }.padding(32).allowsHitTesting(false).accessibilityHidden(true)
-            MorseDrawingSurface(phase: assistant.phase, value: "\(assistant.draft.preview). \(assistant.status)",
+            MorseDrawingSurface(handwriting: assistant.handwritingMode, phase: assistant.phase, value: "\(assistant.compositionText). \(assistant.status)",
                                 onStroke: assistant.addStroke, onPreview: { assistant.stroke = $0 }, onCommand: handle)
+        }
+    }
+
+    private var handwritingContent: some View {
+        HStack(alignment: .top, spacing: 20) {
+            VStack(alignment: .leading, spacing: 14) {
+                Eyebrow(text: "Print one letter at a time")
+                Canvas { context, size in
+                    let scale = min(size.width, size.height / 0.7)
+                    let offset = (size.width - scale) / 2
+                    for stroke in assistant.handwriting.current + [assistant.stroke] {
+                        guard let first = stroke.first else { continue }
+                        var path = Path()
+                        path.move(to: CGPoint(x: offset + first.x * scale, y: size.height - first.y * scale))
+                        for p in stroke.dropFirst() { path.addLine(to: CGPoint(x: offset + p.x * scale, y: size.height - p.y * scale)) }
+                        if stroke.count == 1 { path.addEllipse(in: CGRect(x: offset + first.x * scale - 2, y: size.height - first.y * scale - 2, width: 4, height: 4)) }
+                        context.stroke(path, with: .color(.ocean), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                    }
+                }.frame(height: 230).background(.white.opacity(0.25), in: RoundedRectangle(cornerRadius: 16))
+                Text("\(assistant.handwriting.cells.count) saved · up to 64 letters and spaces")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ocean)
+                Text("Draw with one finger. Lift between strokes.\nSwipe right to save the letter and clear the pad.")
+                    .font(.system(size: 13)).foregroundStyle(.secondary).lineSpacing(4)
+            }.padding(22).glass(solid: model.solid).frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 16) {
+                Eyebrow(text: "Your message")
+                Text(assistant.recognizedText ?? "Your handwriting becomes words here.")
+                    .font(.system(size: 27, weight: .medium, design: .rounded)).lineSpacing(6)
+                    .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
+                Divider()
+                if assistant.phase == .waiting { ProgressView("Reading your handwriting…") }
+                else { Label(assistant.recognizedText == nil ? "Click once to transcribe" : "Click again to ask AI", systemImage: "hand.tap").font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.ocean) }
+                Text(assistant.status).font(.system(size: 13)).lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+                Text("Recognition may be wrong. ? means an uncertain letter. Swipe down to review in Morse; swipe left to correct.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }.padding(22).glass(solid: model.solid).frame(maxWidth: .infinity)
         }
     }
 
@@ -126,7 +163,7 @@ struct AskAIView: View {
                 guide("Swipe right", "Finish letter")
                 guide("Swipe up", "Word space")
                 guide("Swipe left", "Undo")
-                guide("Swipe down", "Feel question")
+                guide("Swipe down", assistant.handwritingMode ? "Feel message" : "Feel question")
             }
         }.padding(20).glass(solid: model.solid)
     }

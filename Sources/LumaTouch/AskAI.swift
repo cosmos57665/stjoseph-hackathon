@@ -48,6 +48,12 @@ enum QuestionPrompt {
 
 @MainActor final class AskAIModel: ObservableObject {
     enum Phase: String { case composing, waiting, answer }
+    typealias Recognition = (AIConfiguration, Data) async throws -> String
+    @Published private(set) var handwritingMode = false
+    @Published private(set) var handwriting = HandwritingDraft()
+    @Published private(set) var recognizedText: String?
+    private let recognition: Recognition
+    var compositionText: String { handwritingMode ? (recognizedText ?? "") : draft.preview }
     typealias Completion = (AIConfiguration, String) async throws -> String
     @Published private(set) var draft = MorseDraft()
     @Published private(set) var phase: Phase = .composing
@@ -66,7 +72,10 @@ enum QuestionPrompt {
     private var generation = UUID()
     private var history: [[String: String]] = []
 
-    init(player: HapticPlayer? = nil, isDemonstration: Bool = false, completion: Completion? = nil) {
+    init(player: HapticPlayer? = nil, isDemonstration: Bool = false, completion: Completion? = nil, recognition: Recognition? = nil) {
+        self.recognition = recognition ?? { config, image in
+            try await AIClient().complete(config: config, prompt: "Transcribe the numbered handwriting cells.", image: image, system: HandwritingPrompt.system)
+        }
         self.player = player ?? HapticPlayer()
         self.isDemonstration = isDemonstration
         self.completion = completion ?? { config, prompt in
@@ -77,20 +86,26 @@ enum QuestionPrompt {
     var answerLines: [String] { Workspace.lines(in: answer) }
     var currentAnswerLine: String { answerLines.indices.contains(answerLine) ? answerLines[answerLine] : "" }
 
-    func prepare(_ context: LessonQuestionContext) {
+    func prepare(_ context: LessonQuestionContext, handwritingMode: Bool = false) {
         suspend()
         if self.context?.documentID != context.documentID {
-            draft = MorseDraft(); answer = ""; submittedQuestion = ""; history = []; answerLine = 0
+            draft = MorseDraft(); handwriting = HandwritingDraft(); recognizedText = nil; answer = ""; submittedQuestion = ""; history = []; answerLine = 0
         }
+        self.handwritingMode = handwritingMode
         self.context = context
         phase = .composing
         status = "Tap for dot, stroke for dash. Swipe right after each letter. Press to click and send."
+        if handwritingMode { status = "Print one letter. Swipe right to save it. Click to transcribe your message." }
         player.cue(.ready)
     }
 
     func addStroke(_ points: [CGPoint]) {
         guard phase == .composing else { return }
         stroke = points
+        if handwritingMode {
+            do { try handwriting.append(points); recognizedText = nil; player.stop(); status = "Stroke added. Lift between strokes; swipe right when the letter is complete." }
+            catch { feedbackError(error.localizedDescription) }; return
+        }
         guard let mark = DrawnMorse.recognize(points) else {
             feedbackError("Stroke not recognized. Tap lightly for a dot or draw a horizontal line for a dash.")
             return
@@ -99,7 +114,7 @@ enum QuestionPrompt {
     }
 
     func add(_ mark: DrawnMorse.Mark) {
-        guard phase == .composing else { return }
+        guard !handwritingMode, phase == .composing else { return }
         player.stop(); isReviewing = false
         do {
             try draft.append(mark); lastShape = mark
@@ -111,6 +126,10 @@ enum QuestionPrompt {
 
     func finishLetter() {
         guard phase == .composing else { return }
+        if handwritingMode {
+            do { try handwriting.finish(); recognizedText = nil; stroke = []; player.stop(); player.cue(.ready); status = "Letter saved. Draw the next letter in the same trackpad space." }
+            catch { feedbackError(error.localizedDescription) }; return
+        }
         do {
             let character = try draft.finishLetter()
             stroke = []; lastShape = nil; isReviewing = false
@@ -121,6 +140,10 @@ enum QuestionPrompt {
 
     func addSpace() {
         guard phase == .composing else { return }
+        if handwritingMode {
+            do { try handwriting.space(); recognizedText = nil; stroke = []; player.stop(); player.cue(.ready); status = "Word space saved." }
+            catch { feedbackError(error.localizedDescription) }; return
+        }
         do { try draft.space(); stroke = []; lastShape = nil; isReviewing = false; player.stop(); player.cue(.ready); status = "Word space added." }
         catch { feedbackError(error.localizedDescription) }
     }
@@ -128,12 +151,20 @@ enum QuestionPrompt {
     func undo() {
         guard phase == .composing else { return }
         player.stop(); isReviewing = false; stroke = []; lastShape = nil
+        if handwritingMode {
+            if handwriting.undo() { recognizedText = nil; status = "Undone. A saved letter is reopened for correction."; player.cue(.ready) }
+            else { feedbackError("Nothing to undo.") }; return
+        }
         if draft.undo() { status = "Removed the last mark, letter or space."; player.cue(.ready) }
         else { feedbackError("Nothing to undo.") }
     }
 
     func review() {
         guard phase == .composing else { return }
+        if handwritingMode {
+            guard let text = recognizedText else { feedbackError("Click to transcribe before reviewing."); return }
+            player.load(text); player.play(); status = "Reviewing the transcription in Morse. Click to ask AI, or undo to correct."; return
+        }
         guard draft.pending.isEmpty || draft.letter != nil else { feedbackError("Finish or correct the incomplete letter before reviewing."); return }
         guard !draft.preview.trimmingCharacters(in: .whitespaces).isEmpty else { feedbackError("Draw a question first."); return }
         player.load(draft.preview); isReviewing = true; status = "Feeling your question. Drawing or another gesture stops review."; player.play()
@@ -142,7 +173,10 @@ enum QuestionPrompt {
     func send(config: AIConfiguration) {
         guard phase == .composing, let context else { return }
         do {
-            let question = try draft.question()
+            if handwritingMode && recognizedText == nil { transcribe(config: config); return }
+            let question = handwritingMode ? recognizedText!.trimmingCharacters(in: .whitespaces) : try draft.question()
+            guard !question.isEmpty else { feedbackError("Draw a message first."); return }
+            if handwritingMode && question.contains("?") { feedbackError("Correct uncertain letters before asking AI."); return }
             guard !config.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 feedbackError("Add an API key in Connections, then return. Your question is kept.", tactile: "NO API KEY")
                 return
@@ -157,7 +191,7 @@ enum QuestionPrompt {
                     let result = try await completion(config, prompt)
                     try Task.checkCancellation()
                     guard generation == token else { return }
-                    answer = result; answerLine = 0; phase = .answer; draft = MorseDraft(); stroke = []; lastShape = nil
+                    answer = result; answerLine = 0; phase = .answer; draft = MorseDraft(); handwriting = HandwritingDraft(); recognizedText = nil; stroke = []; lastShape = nil
                     history.append(["question": question, "answer": String(result.prefix(3000))]); history = Array(history.suffix(2))
                     player.load(currentAnswerLine)
                     status = "Answer ready. Double-click to feel it; swipe left for the next line."
@@ -168,6 +202,31 @@ enum QuestionPrompt {
                     phase = .composing; task = nil
                     if error is CancellationError { status = "Cancelled. Your question is kept." }
                     else { feedbackError("Could not get an answer. Check Connections and retry; your question is kept.", tactile: "AI ERROR") }
+                }
+            }
+        } catch { feedbackError(error.localizedDescription) }
+    }
+
+    func transcribe(config: AIConfiguration) {
+        guard phase == .composing else { return }
+        do {
+            guard !config.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { feedbackError("Add an API key in Connections. Drawing kept.", tactile: "NO API KEY"); return }
+            let image = try handwriting.jpeg(), cells = handwriting.allCells
+            player.stop(); phase = .waiting; status = "Transcribing with \(config.provider.rawValue)… Drawing kept until you approve it."
+            let token = UUID(); generation = token
+            task = Task {
+                do {
+                    let result = try await recognition(config, image)
+                    try Task.checkCancellation()
+                    guard generation == token else { return }
+                    recognizedText = try HandwritingPrompt.parse(result, cells: cells)
+                    phase = .composing; task = nil
+                    status = "Message ready. Swipe down to feel it. Click again only if you want to ask AI. Swipe left to correct."
+                    player.cue(.ready)
+                } catch {
+                    guard generation == token else { return }
+                    phase = .composing; task = nil
+                    feedbackError("Could not transcribe. Use an image-capable model in Connections and retry. Drawing kept.", tactile: "AI ERROR")
                 }
             }
         } catch { feedbackError(error.localizedDescription) }

@@ -127,7 +127,7 @@ import Foundation
     func testSingleRequestReplyAndFollowup() async {
         var requests = 0
         var payloads: [String] = []
-        let model = AskAIModel(player: player()) { _, prompt in requests += 1; payloads.append(prompt); return "Plants need light.\nLight helps make food." }
+        let model = AskAIModel(player: player(), completion: { _, prompt in requests += 1; payloads.append(prompt); return "Plants need light.\nLight helps make food." })
         model.prepare(context()); write("WHY", to: model)
         model.send(config: config); model.send(config: config)
         expectEqual(model.phase, .waiting)
@@ -149,7 +149,7 @@ import Foundation
 
     func testMissingKeyFailureAndCancellationKeepQuestion() async {
         var requests = 0
-        let model = AskAIModel(player: player()) { _, _ in requests += 1; throw AppError.message("do not expose raw response") }
+        let model = AskAIModel(player: player(), completion: { _, _ in requests += 1; throw AppError.message("do not expose raw response") })
         model.prepare(context()); write("WHY", to: model)
         model.send(config: AIConfiguration(provider: .gemini, key: "", model: "test"))
         expectEqual(requests, 0); expectEqual(model.phase, .composing); expectEqual(model.draft.text, "WHY")
@@ -157,7 +157,7 @@ import Foundation
         expectEqual(requests, 1); expectEqual(model.phase, .composing); expectEqual(model.draft.text, "WHY")
         expectFalse(model.status.contains("raw response"))
         model.suspend()
-        let slow = AskAIModel(player: player()) { _, _ in try? await Task.sleep(nanoseconds: 80_000_000); return "Stale answer" }
+        let slow = AskAIModel(player: player(), completion: { _, _ in try? await Task.sleep(nanoseconds: 80_000_000); return "Stale answer" })
         slow.prepare(context()); write("WHY", to: slow); slow.send(config: config)
         await Task.yield(); slow.suspend(); await settle()
         expectEqual(slow.phase, .composing); expectEqual(slow.draft.text, "WHY"); expectEqual(slow.answer, "")
@@ -167,7 +167,7 @@ import Foundation
     }
 
     func testReaderPositionAndEscape() {
-        let assistant = AskAIModel(player: player()) { _, _ in "Test" }
+        let assistant = AskAIModel(player: player(), completion: { _, _ in "Test" })
         let model = Workspace(loadPreferences: false, player: player(), practicePlayer: player(), assistant: assistant)
         model.showTouchWelcome = false
         model.pages = [LessonPage(id: 0, source: "First line\nSecond line", extraction: "Test")]

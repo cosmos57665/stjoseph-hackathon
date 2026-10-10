@@ -7,6 +7,7 @@ enum DrawingCommand: Equatable {
 }
 
 struct MorseDrawingSurface: NSViewRepresentable {
+    var handwriting = false
     let phase: AskAIModel.Phase
     let value: String
     let onStroke: ([CGPoint]) -> Void
@@ -15,8 +16,10 @@ struct MorseDrawingSurface: NSViewRepresentable {
     func makeNSView(context: Context) -> MorseDrawingNSView { let view = MorseDrawingNSView(); configure(view); return view }
     func updateNSView(_ view: MorseDrawingNSView, context: Context) { configure(view) }
     private func configure(_ view: MorseDrawingNSView) {
-        view.phase = phase; view.onStroke = onStroke; view.onPreview = onPreview; view.onCommand = onCommand
+        view.handwriting = handwriting; view.phase = phase; view.onStroke = onStroke; view.onPreview = onPreview; view.onCommand = onCommand
         view.setAccessibilityValue(value)
+        view.setAccessibilityLabel(handwriting ? "Write to communicate" : "Draw Morse to ask AI")
+        if handwriting { view.setAccessibilityHelp("Print one letter using one finger. Lift between strokes. Two-finger swipe right saves the letter, up adds space, left undoes, down reviews recognized text. Physical click transcribes, then another click asks AI. Escape releases the pointer.") }
     }
 }
 
@@ -24,6 +27,7 @@ struct MorseDrawingSurface: NSViewRepresentable {
 /// accompanied by an actual Force Touch pressure event can submit, so macOS
 /// Tap to click cannot turn a Morse dot into a network request.
 final class MorseDrawingNSView: NSView {
+    var handwriting = false
     var phase: AskAIModel.Phase = .composing { didSet { if oldValue != phase { resetStroke(); interpreter.reset() } } }
     var onStroke: (([CGPoint]) -> Void)?
     var onPreview: (([CGPoint]) -> Void)?
@@ -107,7 +111,8 @@ final class MorseDrawingNSView: NSView {
             append(point(touch))
             let finished = points
             self.identity = nil; points = []
-            if DrawnMorse.isTap(finished, duration: event.timestamp - contactStarted) { onCommand?(.dot) }
+            if handwriting { onStroke?(finished) }
+            else if DrawnMorse.isTap(finished, duration: event.timestamp - contactStarted) { onCommand?(.dot) }
             else if let first = finished.first, finished.contains(where: { hypot($0.x - first.x, $0.y - first.y) > 0.02 }) { onStroke?(finished) }
         }
         if activeTouches(event).isEmpty {

@@ -237,6 +237,16 @@ enum Screen: String, CaseIterable {
         askMode = true
     }
 
+    func enterHandwritingMode() {
+        guard !busy, !showPDF, !showTextEntry, error == nil else { return }
+        if !touchMode { enterTouchMode() }
+        stopAll()
+        assistant.player.unit = player.unit
+        assistant.prepare(LessonQuestionContext(documentID: documentID, title: pages.isEmpty ? "Basic communication" : title,
+                                                pageIndex: selectedPage, line: currentLine, pages: pages.map(\.text)), handwritingMode: true)
+        askMode = true
+    }
+
     func returnFromQuestion() {
         assistant.suspend()
         askMode = false

@@ -180,3 +180,41 @@ To test a real question, add a working provider key, choose a PDF passage, and
 enter **WHY**: W is `.--`, H is `....`, Y is `-.--`. Swipe right after each letter,
 then physically click once. The answer should reference the selected passage.
 Rapid additional clicks while waiting must not create duplicate requests.
+
+## Write to communicate — printed handwriting
+
+Choose **Write to communicate** in the reader, or press **Command–Shift–H**.
+This mode also works without an imported PDF. The pointer stays hidden and fixed.
+It is inspired by print-on-palm letter tracing; the trackpad records your writing,
+but does not output raised letters or trace shapes onto your palm.
+
+| Input | Action |
+| --- | --- |
+| Draw with one finger, without pressing down | Add a stroke to the current printed letter |
+| Lift and touch again | Add another stroke to the same letter |
+| Two-finger swipe right | Save this letter and clear the pad for the next |
+| Two-finger swipe up | Save the letter and add a word space |
+| Two-finger swipe left | Undo a stroke; if the pad is empty, reopen the last saved letter or remove its space |
+| Physical click once / Return | Send the drawing to AI for transcription, including the unfinished final letter |
+| Two-finger swipe down | Review the recognized message as Morse |
+| Physical click again / Return | Ask AI about the recognized message, using PDF context if available |
+| Two-finger secondary click | Return to the reader, keeping the draft |
+| Escape | Leave touch mode and restore the pointer |
+
+For example, draw **H** in three strokes, swipe right, then draw **I** and click.
+The first click should display **HI**; it must not request a conversational reply.
+Recognition is probabilistic. Review the result before asking. An uncertain **?**
+blocks asking until corrected; other confidently wrong letters remain possible.
+Swipe left to undo/reopen letters, redraw them and transcribe again.
+
+Use an image-capable model in Gemini, OpenRouter or Groq Connections. A missing
+key, failed request or cancellation keeps the drawing. A transcription sends only
+the rendered handwriting grid; PDF excerpts are sent only when subsequently asking
+AI. The grid holds up to 64 letters/spaces and is constructed in memory; drawings
+and transcriptions are not saved across app restarts. There is no automatic
+language translation or autocorrection: transcription preserves what was written.
+The tactile review still uses Morse, so learners need to know Morse for independent
+review. Handwriting recognition and physical gestures need real-user testing.
+
+Print-on-palm background: https://www.helenkeller.org/resources/print-on-palm-pop/
+Helen Keller's tactile manual alphabet: https://www.afb.org/about-afb/history/online-museums/anne-sullivan-miracle-worker/formative-years/manual-alphabet

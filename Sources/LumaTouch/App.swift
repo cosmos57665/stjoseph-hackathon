@@ -5,13 +5,17 @@ import SwiftUI
     @StateObject private var model: Workspace
     init() {
         let verifying = CommandLine.arguments.contains("--verify-ui")
-        let assistant: AskAIModel? = verifying ? AskAIModel(player: HapticPlayer(output: { _ in }), isDemonstration: true) { _, prompt in
+        let assistant: AskAIModel? = verifying ? AskAIModel(player: HapticPlayer(output: { _ in }), isDemonstration: true, completion: { _, prompt in
             let data = try JSONSerialization.jsonObject(with: Data(prompt.utf8)) as! [String: Any]
             precondition(data["learner_question"] as? String == "WHY")
             precondition(data["document_excerpts"] != nil)
             try await Task.sleep(nanoseconds: 500_000_000)
             return "Demo reply. Your question is linked to the current PDF passage.\nThis response is simulated for testing, with no API request."
-        } : nil
+        }, recognition: { _, image in
+            precondition(NSImage(data: image) != nil)
+            try await Task.sleep(nanoseconds: 200_000_000)
+            return "{\"text\":\"HI\"}"
+        }) : nil
         _model = StateObject(wrappedValue: Workspace(loadPreferences: !verifying, assistant: assistant))
     }
     var body: some Scene {
@@ -31,6 +35,7 @@ import SwiftUI
         .commands {
             CommandGroup(replacing: .newItem) { Button("Import PDF…", action: model.importPDF).keyboardShortcut("o", modifiers: .command).disabled(model.busy) }
             CommandMenu("Playback") {
+                Button("Write to communicate", action: model.enterHandwritingMode).keyboardShortcut("h", modifiers: [.command, .shift])
                 Button("Ask AI about this PDF", action: model.enterAskMode).keyboardShortcut("a", modifiers: [.command, .shift]).disabled(!model.readingControlsAvailable || model.pages.isEmpty)
                 Button("Enter touch mode", action: model.enterTouchMode).keyboardShortcut("t", modifiers: [.command, .shift]).disabled(model.busy || model.showTextEntry || model.showPDF || model.error != nil)
                 Button("Exit touch mode", action: model.exitTouchMode).keyboardShortcut(.escape, modifiers: []).disabled(!model.touchMode && !model.showTouchWelcome)
@@ -135,6 +140,25 @@ import SwiftUI
             checks["returnKeepsPDFPosition"] = !model.askMode && model.selectedLine == savedLine && model.touchMode
             key(53, "\u{1b}")
             try? await Task.sleep(nanoseconds: 300_000_000)
+            model.enterHandwritingMode()
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            checks["handwritingCapturesPointer"] = model.touchMode && model.askMode && model.assistant.handwritingMode
+            let h: [[CGPoint]] = [[CGPoint(x: 0.25, y: 0.2), CGPoint(x: 0.25, y: 0.5)], [CGPoint(x: 0.5, y: 0.2), CGPoint(x: 0.5, y: 0.5)], [CGPoint(x: 0.25, y: 0.35), CGPoint(x: 0.5, y: 0.35)]]
+            for stroke in h { model.assistant.addStroke(stroke) }
+            model.assistant.finishLetter()
+            model.assistant.addStroke([CGPoint(x: 0.4, y: 0.2), CGPoint(x: 0.4, y: 0.5)])
+            snapshot("handwriting-draft")
+            model.keys[model.provider] = "verification-placeholder-not-a-key"
+            key(36, "\r")
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            checks["handwritingTranscribesWithoutAsking"] = model.assistant.recognizedText == "HI" && model.assistant.phase == .composing
+            snapshot("handwriting-message")
+            key(125, "")
+            checks["handwritingReviewPlays"] = model.assistant.player.isPlaying
+            model.keys[model.provider] = ""
+            key(53, "\u{1b}")
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            checks["handwritingEscapeReleases"] = !model.touchMode && !model.askMode
             model.showControls = true
             try? await Task.sleep(nanoseconds: 500_000_000)
             snapshot("controls-guide")

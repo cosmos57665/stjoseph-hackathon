@@ -73,8 +73,19 @@ struct TouchReadingView: View {
 
 struct ControlsGuideView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var asking = false
-    private var rows: [(String, String, String)] { asking ? [
+    @State private var section = 0
+    private var asking: Bool { section == 1 }
+    private var writing: Bool { section == 2 }
+    private var rows: [(String, String, String)] { writing ? [
+        ("Draw with one finger", "Print a letter; lift between its strokes", "⌘⇧H opens this mode"),
+        ("Two-finger swipe right", "Save the letter and clear the drawing pad", "→ / Space"),
+        ("Two-finger swipe up", "Finish the letter and add a word space", "↑"),
+        ("Two-finger swipe left", "Undo a stroke or reopen the saved letter", "← / Delete"),
+        ("One physical click", "Transcribe the drawing into a message", "Return"),
+        ("Two-finger swipe down", "Review the transcription in Morse", "↓"),
+        ("Another physical click", "Ask AI about the recognized message", "Return"),
+        ("Two-finger secondary click", "Return to the reader, keeping the draft", "Esc releases pointer")
+    ] : asking ? [
         ("Light one-finger tap", "Add a Morse dot without pressing", "."),
         ("One-finger horizontal stroke", "Add a Morse dash, then lift", "−"),
         ("Two-finger swipe right", "Finish the current letter", "→ / Space"),
@@ -96,8 +107,8 @@ struct ControlsGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack { Text("Every control, in one place.").font(.title2.weight(.medium)); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }
-            Picker("Controls for", selection: $asking) { Text("Reading").tag(false); Text("Asking AI").tag(true) }.pickerStyle(.segmented)
-            Text(asking ? "The pointer stays fixed. A light tap enters a dot; a physical click sends. Swipe to separate letters at your own pace." : "In touch mode, the whole trackpad controls your lesson. A single click does nothing; there is no small button to find.")
+            Picker("Controls for", selection: $section) { Text("Reading").tag(0); Text("Morse questions").tag(1); Text("Handwriting").tag(2) }.pickerStyle(.segmented)
+            Text(writing ? "The pointer stays fixed. Print one letter at a time, with as many strokes as needed. No Morse input is required." : asking ? "The pointer stays fixed. A light tap enters a dot; a physical click sends. Swipe to separate letters at your own pace." : "In touch mode, the whole trackpad controls your lesson. A single click does nothing; there is no small button to find.")
                 .foregroundStyle(.secondary)
             Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 15) {
                 GridRow { Text("GESTURE"); Text("ACTION"); Text("KEY") }.font(.caption.weight(.bold)).foregroundStyle(.secondary)
@@ -106,8 +117,8 @@ struct ControlsGuideView: View {
                     Divider()
                 }
             }
-            Text(asking ? "The app echoes recognized marks and completed letters. Replies wait for a double-click, then use the reading gestures. Triple-click on a reply for a follow-up; two-finger click returns to your saved PDF line." : "One tick: command accepted. Two ticks: paused. Three ticks: document boundary, speed limit, or unreadable line. A quiet line ending waits for you; it never advances by itself.").font(.system(size: 13)).lineSpacing(4)
-            Text(asking ? "Light taps enter dots even when macOS Tap to click is enabled. Sending requires a physical Force Touch click; Return is a keyboard alternative. The selected provider receives your question and relevant PDF text only when you send. Escape releases the pointer and cancels a pending request." : "Use actual clicks, or taps if Tap to click is enabled in macOS. Replay requires secondary click to be enabled. Keyboard controls above work in touch mode. Switching apps or minimizing also releases the pointer and pauses. A helper can press Escape to import a PDF or configure an AI key.").font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(4)
+            Text(writing ? "First click: transcribe. The message is displayed for communication. Review it, then click again only to ask AI. An uncertain ? must be corrected before asking. Undo reopens saved letters so they can be redrawn." : asking ? "The app echoes recognized marks and completed letters. Replies wait for a double-click, then use the reading gestures. Triple-click on a reply for a follow-up; two-finger click returns to your saved PDF line." : "One tick: command accepted. Two ticks: paused. Three ticks: document boundary, speed limit, or unreadable line. A quiet line ending waits for you; it never advances by itself.").font(.system(size: 13)).lineSpacing(4)
+            Text(writing ? "Uses an image-capable model and your key in Connections. Only the drawing is sent for transcription; a later question includes relevant PDF context. Tactile review still uses Morse. Escape cancels requests and restores the pointer." : asking ? "Light taps enter dots even when macOS Tap to click is enabled. Sending requires a physical Force Touch click; Return is a keyboard alternative. The selected provider receives your question and relevant PDF text only when you send. Escape releases the pointer and cancels a pending request." : "Use actual clicks, or taps if Tap to click is enabled in macOS. Replay requires secondary click to be enabled. Keyboard controls above work in touch mode. Switching apps or minimizing also releases the pointer and pauses. A helper can press Escape to import a PDF or configure an AI key.").font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(4)
         }.padding(30).frame(width: 790)
     }
 }

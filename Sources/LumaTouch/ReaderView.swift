@@ -57,6 +57,7 @@ struct ReaderView: View {
                 Button("Try sample text", action: model.useSample).buttonStyle(ActionStyle())
             }.disabled(model.busy)
             if model.busy { ProgressView(model.activity) }
+            Button("Write to communicate without a PDF", action: model.enterHandwritingMode).buttonStyle(ActionStyle()).disabled(model.busy)
             Button("First, feel a dot and a dash") { model.screen = .practice }.buttonStyle(.plain).font(.caption)
             Button("View all controls") { model.showControls = true }.buttonStyle(.plain).font(.caption)
         }.frame(maxWidth: .infinity).padding(.vertical, 46).glass(solid: model.solid)
@@ -228,6 +229,9 @@ struct PlayerPanel: View {
                 .font(.system(size: 10)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(3)
             Button(action: model.enterAskMode) {
                 Label("Draw a question for AI", systemImage: "pencil.and.scribble").frame(maxWidth: .infinity)
+            }.buttonStyle(ActionStyle()).disabled(model.busy)
+            Button(action: model.enterHandwritingMode) {
+                Label("Write to communicate", systemImage: "hand.draw").frame(maxWidth: .infinity)
             }.buttonStyle(ActionStyle()).disabled(model.busy)
             HStack {
                 Button { model.changeSpeed(-1) } label: { Label("Slower", systemImage: "minus") }

@@ -178,3 +178,20 @@ build or use the application.
 The practice PDFs are original material. The app uses system fonts and SF Symbols;
 it does not redistribute the pre-event asset library or reuse the external UI
 preview's source code.
+
+### Printed handwriting for communication
+
+**Write to communicate** (Command–Shift–H) reuses the fixed-pointer raw trackpad
+surface to collect multi-stroke printed letters. Swipe right to commit each letter,
+up for a space, left to undo. A physical click renders a numbered JPEG letter grid
+in memory and asks the selected image-capable provider to transcribe it. The model
+must preserve one character per cell and explicit word spaces; malformed results
+are rejected, uncertain characters are marked `?`, and drafts survive failures or
+cancellation. No conversational answer is requested until a second deliberate click.
+Swipe down reviews the transcription using the existing Morse player. This is
+print-on-palm-inspired input, not tactile letter output. See the controls guide.
+
+`HandwritingDraft` owns stroke bounds, pen lifts, editing and grid rendering;
+`HandwritingPrompt` separates recognition instructions from image data and validates
+response shape. Recognition is injected in tests and UI verification; passing those
+checks does not establish real handwriting recognition accuracy or provider access.
