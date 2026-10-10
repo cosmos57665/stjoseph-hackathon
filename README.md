@@ -203,3 +203,18 @@ message composer. Transcribe, review, then send; triple-click or press A after a
 to write a follow-up. Fn–Up/Down browse the timeline and Command–Shift–N clears the
 chat and cancels a pending request. History is session-only; the last two completed
 exchanges are included in AI context. Existing Morse reply playback remains available.
+
+### Android output (0.6)
+
+Option–Z opens local pairing, then toggles the selected haptic output after Android
+Chrome has enabled vibration. A QR/link in Connections opens a small receiver page.
+`PhoneBridge` uses Network.framework HTTP/SSE on an ephemeral port, with a fresh
+session token, bounded requests and heartbeat disconnection. Only numeric patterns
+are transmitted. The receiver requires an explicit Enable action and stops when
+hidden. HapticPlayer sends complete letters to preserve their internal timing; pause
+cancels the phone pattern. No amplitude control or background/locked-screen guarantee.
+
+`bash scripts/test-phone.sh` optionally verifies the real local HTTP/SSE transport in
+Chrome using Playwright and mocked vibration hardware. Requires Node/Playwright and
+Chrome at its standard macOS path. Core tests do not start a listener. Physical Android
+vibration remains a manual test; browser acceptance is not motor confirmation.

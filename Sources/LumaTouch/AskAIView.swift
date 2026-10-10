@@ -14,6 +14,7 @@ struct AskAIView: View {
                 HStack {
                     Label("luma touch", systemImage: "waveform.path").font(.system(size: 20, weight: .semibold, design: .rounded)).foregroundStyle(Color.ocean)
                     Spacer()
+                    PhoneOutputBadge(phone: model.phone)
                     Text(assistant.isDemonstration ? "OFFLINE DEMO · NO API CALLS" : assistant.phase == .answer ? "AI REPLY" : assistant.handwritingMode ? "WRITE TO COMMUNICATE" : "DRAW TO ASK")
                         .font(.system(size: 10, weight: .bold)).tracking(2)
                 }

@@ -10,6 +10,9 @@ struct ConnectionsView: View {
                     Text("A little intelligence.\nA lot more access.").font(.system(size: 37, weight: .medium)).tracking(-1.3)
                     Text("Connect one provider to transcribe PDF pages and simplify lessons.").foregroundStyle(.secondary)
                 }
+                Button { model.showPhone = true } label: {
+                    Label("Pair Android for phone vibrations · ⌥Z", systemImage: "iphone.radiowaves.left.and.right")
+                }.buttonStyle(ActionStyle(prominent: true))
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(Provider.allCases) { provider in ProviderCard(model: model, provider: provider) }
                 }

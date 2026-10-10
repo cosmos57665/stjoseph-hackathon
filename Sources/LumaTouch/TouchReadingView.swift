@@ -13,6 +13,7 @@ struct TouchReadingView: View {
                 HStack {
                     Label("luma touch", systemImage: "waveform.path").font(.system(size: 20, weight: .semibold, design: .rounded))
                     Spacer()
+                    PhoneOutputBadge(phone: model.phone)
                     Text(welcoming ? "WELCOME" : "TOUCH MODE").font(.system(size: 10, weight: .bold)).tracking(2)
                 }.foregroundStyle(Color.ocean)
                 Spacer(minLength: 0)

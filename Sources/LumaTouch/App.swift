@@ -28,6 +28,7 @@ import SwiftUI
                     NSApp.activate(ignoringOtherApps: true)
                     if model.pages.isEmpty { model.loadStarter() }
                     if CommandLine.arguments.contains("--verify-ui") { verifyUI() }
+                    else if CommandLine.arguments.contains("--pair-phone") { model.showPhone = true }
                 }
         }
         .defaultSize(width: 1190, height: 880)
@@ -215,6 +216,13 @@ import SwiftUI
             snapshot("connections-dark")
             model.dark = false
             model.screen = .reader
+            let phoneKey = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.option], timestamp: ProcessInfo.processInfo.systemUptime,
+                                            windowNumber: NSApp.keyWindow?.windowNumber ?? 0, context: nil, characters: "z", charactersIgnoringModifiers: "z", isARepeat: false, keyCode: 6)!
+            _ = NSApp.mainMenu?.performKeyEquivalent(with: phoneKey)
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            checks["optionZOpensPhonePairing"] = model.showPhone && model.phone.port != nil
+            snapshot("phone-pairing")
+            model.phone.shutdown(); model.showPhone = false
             let result: [String: Any] = ["pages": model.pages.count, "title": model.title, "morseSymbols": model.player.symbols.count,
                                        "providers": Provider.allCases.map(\.rawValue), "networkRequests": 0, "touchChecks": checks]
             if let data = try? JSONSerialization.data(withJSONObject: result, options: .prettyPrinted) { try? data.write(to: dir.appendingPathComponent("ui-result.json")) }
@@ -228,6 +236,8 @@ struct FeatureCommands: Commands {
     @ObservedObject var model: Workspace
     var body: some Commands {
             CommandMenu("Features") {
+                Button("Toggle Android vibration output", action: model.togglePhoneOutput).keyboardShortcut("z", modifiers: .option)
+                Button("Pair Android phone…") { model.showPhone = true }
                 Button("Activate PDF reading") { model.activate(.reading) }.keyboardShortcut(.upArrow, modifiers: .command)
                 Button("Activate handwriting chat") { model.activate(.handwriting) }.keyboardShortcut(.downArrow, modifiers: .command)
                 Button("Activate Morse questions") { model.activate(.morse) }.keyboardShortcut(.rightArrow, modifiers: .command)
@@ -362,6 +372,7 @@ struct ContentView: View {
                     HStack { Button("Cancel") { model.showTextEntry = false }; Spacer(); Button("Open in reader", action: model.useText).buttonStyle(ActionStyle(prominent: true)).disabled(model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
                 }.padding(30).frame(width: 630)
             }
+            .sheet(isPresented: $model.showPhone) { PhonePairingView(phone: model.phone) }
             .sheet(isPresented: $model.showControls) { ControlsGuideView() }
     }
 

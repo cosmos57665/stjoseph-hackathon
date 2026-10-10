@@ -49,6 +49,13 @@ enum Morse {
         }.filter { !$0.isEmpty }.joined(separator: " / ")
     }
 
+    static func vibrationPattern(code: String, unit: Double) -> [Int] {
+        let tick = Int((min(0.45, max(0.12, unit)) * 1000).rounded())
+        return code.enumerated().flatMap { index, mark in
+            (index == 0 ? [] : [tick]) + [tick * (mark == "-" ? 3 : 1)]
+        }
+    }
+
     static func units(_ symbols: [MorseSymbol]) -> Int {
         symbols.enumerated().reduce(0) { total, pair in
             let (i, symbol) = pair
@@ -67,6 +74,8 @@ enum Morse {
     @Published var isPulsing = false
     @Published var unit: Double = 0.22
     @Published var status = "Rest a finger lightly on the trackpad."
+    var phoneOutput: (([Int]) -> Bool)?
+    var phoneStop: (() -> Void)?
     private var task: Task<Void, Never>?
     private var generation = UUID()
     private var cueTask: Task<Void, Never>?
@@ -88,6 +97,8 @@ enum Morse {
         let count = cue == .ready ? 1 : cue == .paused ? 2 : 3
         let delay = cue == .boundary ? 0.25 : 0.16
         let pattern: NSHapticFeedbackManager.FeedbackPattern = cue == .boundary ? .levelChange : .alignment
+        let phonePattern = (0..<count).flatMap { index in (index == 0 ? [] : [Int(delay * 1000) - 50]) + [50] }
+        if phoneOutput?(phonePattern) == true { return }
         // Feedback is separate from the Morse stream; play() leaves a lead-in.
         output(pattern)
         guard count > 1 else { return }
@@ -111,6 +122,7 @@ enum Morse {
     }
 
     func stop() {
+        phoneStop?()
         generation = UUID()
         task?.cancel()
         task = nil
@@ -149,10 +161,11 @@ enum Morse {
                     try Task.checkCancellation()
                     let symbol = symbols[index]
                     status = "Feeling letter \(symbol.character)"
+                    let remote = phoneOutput?(Morse.vibrationPattern(code: symbol.code, unit: unit)) == true
                     let marks = Array(symbol.code)
                     for (offset, mark) in marks.enumerated() {
                         markIndex = offset
-                        try await pulse(dash: mark == "-")
+                        try await pulse(dash: mark == "-", remote: remote)
                         if offset + 1 < marks.count { try await sleep(unit) }
                     }
                     markIndex = -1
@@ -175,7 +188,7 @@ enum Morse {
         }
     }
 
-    private func pulse(dash: Bool) async throws {
+    private func pulse(dash: Bool, remote: Bool) async throws {
         let length = unit * (dash ? 3 : 1)
         isPulsing = true
         // AppKit exposes presets, not custom motor waveforms. A dash is an
@@ -183,7 +196,7 @@ enum Morse {
         let count = dash ? max(3, Int(length / 0.07)) : 1
         for _ in 0..<count {
             try Task.checkCancellation()
-            output(.generic)
+            if !remote { output(.generic) }
             try await sleep(length / Double(count))
         }
         isPulsing = false

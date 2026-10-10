@@ -278,3 +278,29 @@ three times with at most one second between clicks while the pointer is over the
 welcome window. This no longer depends on macOS classifying a triple-click or on
 keeping the pointer at exactly the same spot. Loading must finish first. The pointer
 is captured after entry; Space then plays/pauses. Command–Up is another direct entry.
+
+## Android vibration output (0.6)
+
+1. Connect Android and Mac to the same trusted Wi-Fi (guest networks may isolate devices).
+2. Press **Option–Z** in Luma Touch or choose **Connections → Pair Android**.
+3. Scan the pairing QR code with the phone camera and open it in **Chrome**.
+4. Tap **Enable vibration** on the phone. Use **Test dot and dash** to check the motor.
+5. Close the pairing sheet with Done/Escape. Press **Option–Z** again to select Android.
+6. Open a reading/chat mode and start playback normally. The output badge identifies
+   the selected device. **Option–Z** toggles back to the Mac; switching pauses playback.
+
+Each letter is transmitted as one vibration pattern (dot one unit, dash three units)
+to preserve its internal timing. Letter-to-letter timing can still vary with Wi-Fi.
+This carries reading, question/reply playback and control cues. Phone strength is
+controlled by the phone/browser, not Luma; the hardware feel differs from the trackpad.
+Keep the receiver page visible and the phone awake. Hidden pages stop and disconnect;
+connection loss pauses Mac playback and returns output to the Mac. Re-enable on the
+phone, select phone output again, then resume. Android silent/DND or browser settings
+may prevent vibration even if a request is accepted. Test physically before relying on it.
+
+Pairing starts a temporary local HTTP server with an unguessable session link. It
+sends only numeric timings, not text, PDFs or keys. Treat the link as private; use
+trusted Wi-Fi. No cloud relay or installed Android app is required. macOS may ask for
+local-network/firewall access. Stop pairing closes the listener and revokes the link.
+
+Browser API reference: https://developer.mozilla.org/en-US/docs/Web/API/Navigator/vibrate

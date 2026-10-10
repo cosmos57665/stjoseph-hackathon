@@ -28,6 +28,8 @@ enum Screen: String, CaseIterable {
     @Published var touchMode = false
     @Published var askMode = false
     @Published var showTouchWelcome = true { didSet { if showTouchWelcome { stopAll() } } }
+    let phone = PhoneBridge()
+    @Published var showPhone = false { didSet { if showPhone { exitTouchMode(); stopAll() } } }
     @Published var showControls = false { didSet { if showControls { exitTouchMode(); stopAll() } } }
     @Published var title = "A little curiosity. A new connection."
     @Published var documentURL: URL?
@@ -62,6 +64,13 @@ enum Screen: String, CaseIterable {
         self.player = player ?? HapticPlayer()
         self.practicePlayer = practicePlayer ?? HapticPlayer()
         self.assistant = assistant ?? AskAIModel()
+        for playback in [self.player, self.practicePlayer, self.assistant.player] {
+            playback.phoneOutput = { [weak phone] pattern in phone?.play(pattern) ?? false }
+            playback.phoneStop = { [weak phone] in phone?.stop() }
+        }
+        phone.onDisconnect = { [weak self] in
+            self?.player.pause(); self?.practicePlayer.pause(); self?.assistant.player.pause()
+        }
         guard loadPreferences else { return }
         // Keys are read only when the user previously explicitly chose to save them.
         for p in Provider.allCases {
@@ -81,7 +90,7 @@ enum Screen: String, CaseIterable {
     var readingLines: [String] { Self.lines(in: visibleText) }
     var currentLine: String { readingLines.indices.contains(selectedLine) ? readingLines[selectedLine] : "" }
     var lineLabel: String { readingLines.isEmpty ? "No readable lines" : "Page \(selectedPage + 1) · Line \(selectedLine + 1) of \(readingLines.count)" }
-    var readingControlsAvailable: Bool { screen == .reader && !askMode && !busy && !showPDF && !showTextEntry && !showControls && error == nil && !showTouchWelcome }
+    var readingControlsAvailable: Bool { screen == .reader && !askMode && !busy && !showPDF && !showTextEntry && !showControls && !showPhone && error == nil && !showTouchWelcome }
 
     func configuration(for provider: Provider? = nil) -> AIConfiguration {
         let p = provider ?? self.provider
@@ -207,7 +216,7 @@ enum Screen: String, CaseIterable {
     }
 
     enum Feature { case reading, handwriting, morse, practice }
-    var canActivateFeature: Bool { !busy && !showPDF && !showTextEntry && !showControls && error == nil }
+    var canActivateFeature: Bool { !busy && !showPDF && !showTextEntry && !showControls && !showPhone && error == nil }
 
     func activate(_ feature: Feature) {
         guard canActivateFeature else { return }
@@ -230,8 +239,14 @@ enum Screen: String, CaseIterable {
         }
     }
 
+    func togglePhoneOutput() {
+        player.pause(); practicePlayer.pause(); assistant.player.pause()
+        if phone.ready || phone.enabled { _ = phone.toggle() }
+        else { showPhone = true; phone.start() }
+    }
+
     func enterTouchMode() {
-        guard !busy, !showPDF, !showTextEntry, error == nil else { return }
+        guard !busy, !showPDF, !showTextEntry, !showPhone, error == nil else { return }
         stopAll()
         askMode = false
         showTouchWelcome = false
@@ -262,7 +277,7 @@ enum Screen: String, CaseIterable {
     }
 
     func enterHandwritingMode() {
-        guard !busy, !showPDF, !showTextEntry, error == nil else { return }
+        guard !busy, !showPDF, !showTextEntry, !showPhone, error == nil else { return }
         if !touchMode { enterTouchMode() }
         stopAll()
         assistant.player.unit = player.unit

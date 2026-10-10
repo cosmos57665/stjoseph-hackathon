@@ -14,10 +14,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>app.lumatouch.prototype</string>
 <key>CFBundleName</key><string>Luma Touch</string>
 <key>CFBundleDisplayName</key><string>Luma Touch</string>
-<key>CFBundleVersion</key><string>8</string>
-<key>CFBundleShortVersionString</key><string>0.5.3</string>
+<key>CFBundleVersion</key><string>9</string>
+<key>CFBundleShortVersionString</key><string>0.6.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>NSLocalNetworkUsageDescription</key><string>Connect your Android phone to receive Morse vibration patterns over your local Wi-Fi.</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
