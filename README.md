@@ -218,3 +218,21 @@ cancels the phone pattern. No amplitude control or background/locked-screen guar
 Chrome using Playwright and mocked vibration hardware. Requires Node/Playwright and
 Chrome at its standard macOS path. Core tests do not start a listener. Physical Android
 vibration remains a manual test; browser acceptance is not motor confirmation.
+
+## Spoken access and visual conversation (0.7)
+
+Two additional modes are available from the sidebar and Features menu:
+
+- **Command–Shift–R — Read aloud:** paste text, use the current PDF page, or import
+  a local video/audio clip up to ten minutes. Native speech offers pause/resume,
+  stop, language and speed controls. On-device Apple Speech transcribes dialogue;
+  the completed text can then be read aloud. Visual scene description is not included.
+- **Command–Shift–L — Conversation:** editable quick phrases, large typed messages,
+  optional speech to a hearing partner, and explicit microphone Start/Stop captions.
+  Captions are for deaf or nonspeaking users who can see; partners can also type.
+
+No provider key is needed for these modes. Speech recognition availability depends
+on installed on-device language support. macOS requests speech/microphone permission
+only when those features are started. Recognition may be wrong; review important
+content. See the [controls guide](docs/Controls-Guide.md) for keyboard shortcuts,
+limits, privacy behavior and test steps.

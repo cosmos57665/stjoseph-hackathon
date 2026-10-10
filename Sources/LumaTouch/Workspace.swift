@@ -8,6 +8,11 @@ enum Screen: String, CaseIterable {
     var icon: String { switch self { case .reader: return "book.pages"; case .practice: return "hand.draw"; case .connections: return "slider.horizontal.3" } }
 }
 
+enum AccessTool: String, Identifiable {
+    case spoken, visual
+    var id: String { rawValue }
+}
+
 @MainActor final class Workspace: ObservableObject {
     @Published var screen: Screen = .reader {
         didSet {
@@ -29,6 +34,7 @@ enum Screen: String, CaseIterable {
     @Published var askMode = false
     @Published var showTouchWelcome = true { didSet { if showTouchWelcome { stopAll() } } }
     let phone = PhoneBridge()
+    @Published var accessTool: AccessTool? { didSet { if accessTool != nil { exitTouchMode(); stopAll() } } }
     @Published var showPhone = false { didSet { if showPhone { exitTouchMode(); stopAll() } } }
     @Published var showControls = false { didSet { if showControls { exitTouchMode(); stopAll() } } }
     @Published var title = "A little curiosity. A new connection."
@@ -90,7 +96,7 @@ enum Screen: String, CaseIterable {
     var readingLines: [String] { Self.lines(in: visibleText) }
     var currentLine: String { readingLines.indices.contains(selectedLine) ? readingLines[selectedLine] : "" }
     var lineLabel: String { readingLines.isEmpty ? "No readable lines" : "Page \(selectedPage + 1) · Line \(selectedLine + 1) of \(readingLines.count)" }
-    var readingControlsAvailable: Bool { screen == .reader && !askMode && !busy && !showPDF && !showTextEntry && !showControls && !showPhone && error == nil && !showTouchWelcome }
+    var readingControlsAvailable: Bool { screen == .reader && !askMode && !busy && !showPDF && !showTextEntry && !showControls && !showPhone && accessTool == nil && error == nil && !showTouchWelcome }
 
     func configuration(for provider: Provider? = nil) -> AIConfiguration {
         let p = provider ?? self.provider
@@ -216,7 +222,7 @@ enum Screen: String, CaseIterable {
     }
 
     enum Feature { case reading, handwriting, morse, practice }
-    var canActivateFeature: Bool { !busy && !showPDF && !showTextEntry && !showControls && !showPhone && error == nil }
+    var canActivateFeature: Bool { !busy && !showPDF && !showTextEntry && !showControls && !showPhone && accessTool == nil && error == nil }
 
     func activate(_ feature: Feature) {
         guard canActivateFeature else { return }
@@ -239,14 +245,20 @@ enum Screen: String, CaseIterable {
         }
     }
 
+    func openAccessTool(_ tool: AccessTool) {
+        guard canActivateFeature else { return }
+        accessTool = tool
+    }
+
     func togglePhoneOutput() {
+        guard accessTool == nil else { return }
         player.pause(); practicePlayer.pause(); assistant.player.pause()
         if phone.ready || phone.enabled { _ = phone.toggle() }
         else { showPhone = true; phone.start() }
     }
 
     func enterTouchMode() {
-        guard !busy, !showPDF, !showTextEntry, !showPhone, error == nil else { return }
+        guard !busy, !showPDF, !showTextEntry, !showPhone, accessTool == nil, error == nil else { return }
         stopAll()
         askMode = false
         showTouchWelcome = false
@@ -277,7 +289,7 @@ enum Screen: String, CaseIterable {
     }
 
     func enterHandwritingMode() {
-        guard !busy, !showPDF, !showTextEntry, !showPhone, error == nil else { return }
+        guard !busy, !showPDF, !showTextEntry, !showPhone, accessTool == nil, error == nil else { return }
         if !touchMode { enterTouchMode() }
         stopAll()
         assistant.player.unit = player.unit

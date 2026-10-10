@@ -124,6 +124,8 @@ func expectThrows<T>(_ expression: @autoclosure () throws -> T, file: StaticStri
         try await AskAITests().run()
         try await HandwritingTests().run()
         try await PhoneTests().run()
+        try await SpokenAccessTests().run()
+        try await VisualConversationTests().run()
         print("PASS: \(checks) assertions covering Morse, PDF/OCR, providers, reader controls, drawn questions, tap/press separation and AI request lifecycle. No live API calls or haptic output.")
     }
 }

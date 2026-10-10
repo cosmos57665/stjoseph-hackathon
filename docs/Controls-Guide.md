@@ -304,3 +304,44 @@ trusted Wi-Fi. No cloud relay or installed Android app is required. macOS may as
 local-network/firewall access. Stop pairing closes the listener and revokes the link.
 
 Browser API reference: https://developer.mozilla.org/en-US/docs/Web/API/Navigator/vibrate
+
+## Read aloud and video dialogue (0.7)
+
+Open **Read aloud** in the sidebar or press **Command–Shift–R**, including from the
+welcome screen. This releases the captured pointer and pauses Morse playback.
+
+- Paste text, or choose **Use current PDF page** (uses the displayed page text).
+- **Command–Return:** read aloud. **Command–Option–P:** pause/resume.
+- **Command–Option–period:** stop speaking. **Escape / Done:** close and cancel work.
+- Set the language and reading speed before starting speech.
+- **Command–Option–O / Import video or audio:** select a local clip up to ten minutes.
+  Apple Speech transcribes its audio on this Mac in 45-second parts. The completed
+  transcript replaces the editor only after successful completion; failure or cancel
+  preserves the original text. Press Read aloud to hear the transcript.
+
+macOS asks for Speech Recognition permission at the first transcription. On-device
+recognition must be available for the chosen language; otherwise an error explains
+how to continue with another language or a pasted transcript. No AI provider key is
+required and audio is not automatically sent to a cloud provider. Recognition may
+mishear dialogue or cut words at chunk boundaries. This feature transcribes speech;
+it does not describe objects, slides or actions visible in a video.
+
+## Visual conversation and live captions (0.7)
+
+Open **Conversation** in the sidebar or press **Command–Shift–L**. For deaf and
+nonspeaking users who can see, the two panels support a face-to-face exchange:
+
+1. Type a message or choose an editable quick phrase.
+2. Choose **Show large** to display it to your partner; Back returns to the panels.
+3. **Speak** optionally reads your text to a hearing partner. **Stop voice** stops it.
+4. Choose the partner's language and **Start captions**, then allow Speech Recognition
+   and Microphone permission when macOS asks. Their speech appears as large text.
+5. **Stop captions** switches the microphone off. Recognition can finish a segment;
+   press Start captions again to continue. If unavailable, your partner can type.
+6. **Clear conversation** removes this session's messages and captions after confirmation.
+   **Done / Escape** closes the mode. Switching apps also stops active capture.
+
+Showing a large message or speaking stops microphone capture. Language support varies;
+check captions with your partner. Audio is not saved. These modes have automated
+state/UI checks, but live recognition accuracy, audible playback and VoiceOver usability
+still require testing with the intended users.

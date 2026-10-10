@@ -309,7 +309,33 @@ import Foundation
         expectTrue(condition())
     }
 
+    func testAccessToolsReleasePointerAndGuardOtherModes() {
+        let model = workspace(["HELLO"])
+        model.enterTouchMode()
+        expectTrue(model.touchMode)
+        model.openAccessTool(.spoken)
+        expectEqual(model.accessTool, .spoken)
+        expectFalse(model.touchMode)
+        expectFalse(model.player.isPlaying)
+        expectFalse(model.readingControlsAvailable)
+        expectFalse(model.canActivateFeature)
+        model.enterHandwritingMode()
+        model.enterTouchMode()
+        expectFalse(model.askMode)
+        expectFalse(model.touchMode)
+        model.openAccessTool(.visual)
+        expectEqual(model.accessTool, .spoken)
+        model.accessTool = nil
+        model.openAccessTool(.visual)
+        expectEqual(model.accessTool, .visual)
+        model.accessTool = nil
+        model.showTextEntry = true
+        model.openAccessTool(.spoken)
+        expectNil(model.accessTool)
+    }
+
     func run() async {
+        testAccessToolsReleasePointerAndGuardOtherModes()
         testSourceLinesStayIntact()
         testLineNavigationCrossesPagesAndSkipsBlankPages()
         testDocumentBoundariesDoNotWrap()

@@ -29,6 +29,8 @@ import SwiftUI
                     if model.pages.isEmpty { model.loadStarter() }
                     if CommandLine.arguments.contains("--verify-ui") { verifyUI() }
                     else if CommandLine.arguments.contains("--pair-phone") { model.showPhone = true }
+                    else if CommandLine.arguments.contains("--spoken-access") { model.accessTool = .spoken }
+                    else if CommandLine.arguments.contains("--visual-communication") { model.accessTool = .visual }
                 }
         }
         .defaultSize(width: 1190, height: 880)
@@ -223,6 +225,17 @@ import SwiftUI
             checks["optionZOpensPhonePairing"] = model.showPhone && model.phone.port != nil
             snapshot("phone-pairing")
             model.phone.shutdown(); model.showPhone = false
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            for (character, code, tool) in [("r", UInt16(15), AccessTool.spoken), ("l", UInt16(37), AccessTool.visual)] {
+                let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: ProcessInfo.processInfo.systemUptime,
+                                            windowNumber: NSApp.keyWindow?.windowNumber ?? 0, context: nil, characters: character.uppercased(), charactersIgnoringModifiers: character, isARepeat: false, keyCode: code)!
+                let handled = NSApp.mainMenu?.performKeyEquivalent(with: event) ?? false
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                checks["accessTool-\(tool.rawValue)"] = handled && model.accessTool == tool && !model.touchMode && !model.readingControlsAvailable
+                snapshot("access-" + tool.rawValue)
+                model.accessTool = nil
+                try? await Task.sleep(nanoseconds: 400_000_000)
+            }
             let result: [String: Any] = ["pages": model.pages.count, "title": model.title, "morseSymbols": model.player.symbols.count,
                                        "providers": Provider.allCases.map(\.rawValue), "networkRequests": 0, "touchChecks": checks]
             if let data = try? JSONSerialization.data(withJSONObject: result, options: .prettyPrinted) { try? data.write(to: dir.appendingPathComponent("ui-result.json")) }
@@ -236,6 +249,9 @@ struct FeatureCommands: Commands {
     @ObservedObject var model: Workspace
     var body: some Commands {
             CommandMenu("Features") {
+                Button("Read aloud and transcribe video…") { model.openAccessTool(.spoken) }.keyboardShortcut("r", modifiers: [.command, .shift])
+                Button("Visual conversation and captions…") { model.openAccessTool(.visual) }.keyboardShortcut("l", modifiers: [.command, .shift])
+                Divider()
                 Button("Toggle Android vibration output", action: model.togglePhoneOutput).keyboardShortcut("z", modifiers: .option)
                 Button("Pair Android phone…") { model.showPhone = true }
                 Button("Activate PDF reading") { model.activate(.reading) }.keyboardShortcut(.upArrow, modifiers: .command)
@@ -284,6 +300,13 @@ struct ContentView: View {
                                     .background(.white.opacity(model.screen == screen ? 0.40 : 0), in: RoundedRectangle(cornerRadius: 13))
                             }.buttonStyle(.plain).accessibilityAddTraits(model.screen == screen ? [.isSelected] : [])
                         }
+                        Divider().padding(.vertical, 8)
+                        Button { model.openAccessTool(.spoken) } label: {
+                            Label("Read aloud", systemImage: "speaker.wave.2").font(.system(size: 13)).padding(10)
+                        }.buttonStyle(.plain).help("Text and video speech · Command–Shift–R")
+                        Button { model.openAccessTool(.visual) } label: {
+                            Label("Conversation", systemImage: "captions.bubble").font(.system(size: 13)).padding(10)
+                        }.buttonStyle(.plain).help("Visual messages and live captions · Command–Shift–L")
                         Spacer()
                         VStack(alignment: .leading, spacing: 10) {
                             Image(systemName: "hand.point.up.braille").font(.system(size: 24)).foregroundStyle(Color.ocean)
@@ -371,6 +394,12 @@ struct ContentView: View {
                     TextEditor(text: $model.draft).font(.system(size: 17)).frame(height: 240).accessibilityLabel("Lesson text to import")
                     HStack { Button("Cancel") { model.showTextEntry = false }; Spacer(); Button("Open in reader", action: model.useText).buttonStyle(ActionStyle(prominent: true)).disabled(model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
                 }.padding(30).frame(width: 630)
+            }
+            .sheet(item: $model.accessTool) { tool in
+                switch tool {
+                case .spoken: SpokenAccessView(pdfText: model.visibleText)
+                case .visual: VisualConversationView()
+                }
             }
             .sheet(isPresented: $model.showPhone) { PhonePairingView(phone: model.phone) }
             .sheet(isPresented: $model.showControls) { ControlsGuideView() }
