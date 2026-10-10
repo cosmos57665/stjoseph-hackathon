@@ -4,6 +4,7 @@ import SwiftUI
 enum TouchCommand: Equatable {
     case togglePlayback, nextLine, previousLine, replayLine, faster, slower, pause
     case enterTouchMode, exitTouchMode
+    case askQuestion
 }
 
 /// A view-independent interpreter so momentum, direction and accidental gestures
@@ -99,6 +100,7 @@ struct TouchControlSurface: NSViewRepresentable {
     var activationOnly: Bool = false
     var focusOnAppear: Bool = false
     var allowsSpeedGestures: Bool = true
+    var allowsQuestionEntry: Bool = false
     var accessibilityValue: String = ""
     var onCommand: (TouchCommand) -> Void
 
@@ -115,6 +117,7 @@ struct TouchControlSurface: NSViewRepresentable {
         view.activationOnly = activationOnly
         view.focusOnAppear = focusOnAppear
         view.allowsSpeedGestures = allowsSpeedGestures
+        view.allowsQuestionEntry = allowsQuestionEntry
         view.onCommand = onCommand
         view.setAccessibilityEnabled(enabled)
         view.setAccessibilityValue(accessibilityValue)
@@ -132,6 +135,7 @@ final class TouchControlNSView: NSView {
     }
     var focusOnAppear = false
     var allowsSpeedGestures = true
+    var allowsQuestionEntry = false
     var inputEnabled = true {
         didSet {
             if !inputEnabled { interpreter.reset() }
@@ -196,6 +200,7 @@ final class TouchControlNSView: NSView {
             return
         }
         window?.makeFirstResponder(self)
+        if allowsQuestionEntry, !activationOnly, event.clickCount == 3 { onCommand?(.askQuestion); return }
         if let command = TouchGestureInterpreter.clickCommand(clickCount: event.clickCount, activationOnly: activationOnly) { onCommand?(command) }
     }
 

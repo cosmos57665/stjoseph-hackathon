@@ -121,6 +121,7 @@ func expectThrows<T>(_ expression: @autoclosure () throws -> T, file: StaticStri
         suite.testPlayerNavigationAndReset()
         await ReaderControlTests().run()
         TouchControlTests().run()
-        print("PASS: \(checks) assertions covering Morse, PDF/OCR, provider requests, reader playback, line navigation and touch controls. No live API calls or haptic output.")
+        try await AskAITests().run()
+        print("PASS: \(checks) assertions covering Morse, PDF/OCR, providers, reader controls, drawn questions, tap/press separation and AI request lifecycle. No live API calls or haptic output.")
     }
 }

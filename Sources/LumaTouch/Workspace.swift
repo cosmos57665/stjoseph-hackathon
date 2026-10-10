@@ -26,6 +26,7 @@ enum Screen: String, CaseIterable {
     @Published var selectedPage = 0
     @Published var selectedLine = 0
     @Published var touchMode = false
+    @Published var askMode = false
     @Published var showTouchWelcome = true { didSet { if showTouchWelcome { stopAll() } } }
     @Published var showControls = false { didSet { if showControls { exitTouchMode(); stopAll() } } }
     @Published var title = "A little curiosity. A new connection."
@@ -51,13 +52,16 @@ enum Screen: String, CaseIterable {
     @Published var speaking = false
     let player: HapticPlayer
     let practicePlayer: HapticPlayer
+    let assistant: AskAIModel
+    private(set) var documentID = UUID()
     private let speaker = AVSpeechSynthesizer()
     private var aiTask: Task<Void, Never>?
     private var operation = UUID()
 
-    init(loadPreferences: Bool = true, player: HapticPlayer? = nil, practicePlayer: HapticPlayer? = nil) {
+    init(loadPreferences: Bool = true, player: HapticPlayer? = nil, practicePlayer: HapticPlayer? = nil, assistant: AskAIModel? = nil) {
         self.player = player ?? HapticPlayer()
         self.practicePlayer = practicePlayer ?? HapticPlayer()
+        self.assistant = assistant ?? AskAIModel()
         guard loadPreferences else { return }
         // Keys are read only when the user previously explicitly chose to save them.
         for p in Provider.allCases {
@@ -77,7 +81,7 @@ enum Screen: String, CaseIterable {
     var readingLines: [String] { Self.lines(in: visibleText) }
     var currentLine: String { readingLines.indices.contains(selectedLine) ? readingLines[selectedLine] : "" }
     var lineLabel: String { readingLines.isEmpty ? "No readable lines" : "Page \(selectedPage + 1) · Line \(selectedLine + 1) of \(readingLines.count)" }
-    var readingControlsAvailable: Bool { screen == .reader && !busy && !showPDF && !showTextEntry && !showControls && error == nil && !showTouchWelcome }
+    var readingControlsAvailable: Bool { screen == .reader && !askMode && !busy && !showPDF && !showTextEntry && !showControls && error == nil && !showTouchWelcome }
 
     func configuration(for provider: Provider? = nil) -> AIConfiguration {
         let p = provider ?? self.provider
@@ -148,6 +152,7 @@ enum Screen: String, CaseIterable {
                 }.value
                 guard operation == token else { return }
                 pages = imported
+                documentID = UUID()
                 documentURL = url
                 title = url.deletingPathExtension().lastPathComponent
                 selectedPage = 0
@@ -161,6 +166,7 @@ enum Screen: String, CaseIterable {
 
     func useSample() {
         stopAll()
+        documentID = UUID()
         documentURL = nil
         title = "Small wonders of the natural world"
         pages = [LessonPage(id: 0, source: "Plants turn sunlight into food.\n\nLeaves absorb light using a green pigment called chlorophyll. They use water and carbon dioxide to make glucose. Oxygen is released into the air.\n\nThis process is called photosynthesis. It helps plants grow and supports life on Earth.", extraction: "Sample lesson"),
@@ -175,6 +181,7 @@ enum Screen: String, CaseIterable {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         stopAll()
+        documentID = UUID()
         documentURL = nil
         title = "Your words, a different way"
         pages = [LessonPage(id: 0, source: text, extraction: "Pasted text")]
@@ -202,6 +209,7 @@ enum Screen: String, CaseIterable {
     func enterTouchMode() {
         guard !busy, !showPDF, !showTextEntry, error == nil else { return }
         stopAll()
+        askMode = false
         showTouchWelcome = false
         showControls = false
         screen = .reader
@@ -214,7 +222,26 @@ enum Screen: String, CaseIterable {
         let wasReading = touchMode
         showTouchWelcome = false
         touchMode = false
+        askMode = false
+        assistant.suspend()
         if wasReading { pauseReading(); practicePlayer.stop() }
+    }
+
+    func enterAskMode() {
+        guard readingControlsAvailable, !pages.isEmpty else { return }
+        if !touchMode { enterTouchMode() }
+        stopAll()
+        assistant.player.unit = player.unit
+        assistant.prepare(LessonQuestionContext(documentID: documentID, title: title, pageIndex: selectedPage,
+                                                line: currentLine, pages: pages.map(\.text)))
+        askMode = true
+    }
+
+    func returnFromQuestion() {
+        assistant.suspend()
+        askMode = false
+        player.status = "Back at your PDF. Double-click to continue this line."
+        player.cue(.ready)
     }
 
     func toggleReading() {
@@ -309,7 +336,7 @@ enum Screen: String, CaseIterable {
         player.cue(.boundary)
     }
 
-    func stopAll() { player.stop(); practicePlayer.stop(); speaker.stopSpeaking(at: .immediate); speaking = false }
+    func stopAll() { player.stop(); practicePlayer.stop(); assistant.suspend(); speaker.stopSpeaking(at: .immediate); speaking = false }
 
     func speak() {
         if speaker.isSpeaking { speaker.stopSpeaking(at: .immediate); speaking = false; return }

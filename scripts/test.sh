@@ -8,7 +8,9 @@ swiftc -parse-as-library -swift-version 5 \
   Sources/LumaTouch/Morse.swift Sources/LumaTouch/AIClient.swift \
   Sources/LumaTouch/PDFReader.swift Sources/LumaTouch/Workspace.swift \
   Sources/LumaTouch/TouchControlSurface.swift \
+  Sources/LumaTouch/DrawnMorse.swift Sources/LumaTouch/AskAI.swift Sources/LumaTouch/MorseDrawingSurface.swift \
   Tests/LumaTouchTests/CoreTests.swift Tests/LumaTouchTests/ReaderControlTests.swift \
   Tests/LumaTouchTests/TouchControlTests.swift \
+  Tests/LumaTouchTests/AskAITests.swift \
   -o .build/core-tests
 .build/core-tests

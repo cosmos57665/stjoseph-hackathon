@@ -47,9 +47,10 @@ struct TouchReadingView: View {
                 }.padding(20).glass(solid: model.solid)
                 Text("Keep a finger resting on the trackpad to feel the pulses. Each line waits for your next action.")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
-                Text("ESC  ·  Pause and restore the pointer").font(.system(size: 14, weight: .semibold)).padding(.bottom, 7)
+                Text(welcoming ? "ESC  ·  Open standard controls" : "3 clicks  ·  Ask AI about this PDF     |     ESC  ·  Restore the pointer")
+                    .font(.system(size: 14, weight: .semibold)).padding(.bottom, 7)
             }.padding(32).allowsHitTesting(false).accessibilityHidden(true)
-            TouchControlSurface(activationOnly: welcoming, focusOnAppear: true,
+            TouchControlSurface(activationOnly: welcoming, focusOnAppear: true, allowsQuestionEntry: !welcoming,
                                 accessibilityValue: welcoming ? "Three clicks to enter touch mode" : "\(model.lineLabel). \(player.status)", onCommand: onCommand)
                 .id(welcoming)
             if welcoming {
@@ -72,19 +73,31 @@ struct TouchReadingView: View {
 
 struct ControlsGuideView: View {
     @Environment(\.dismiss) private var dismiss
-    private let rows = [
+    @State private var asking = false
+    private var rows: [(String, String, String)] { asking ? [
+        ("Light one-finger tap", "Add a Morse dot without pressing", "."),
+        ("One-finger horizontal stroke", "Add a Morse dash, then lift", "−"),
+        ("Two-finger swipe right", "Finish the current letter", "→ / Space"),
+        ("Two-finger swipe up", "Finish the word and insert a space", "↑"),
+        ("Two-finger swipe left", "Undo a mark, letter or word space", "← / Delete"),
+        ("Two-finger swipe down", "Feel the drafted question in Morse", "↓"),
+        ("One physical press-and-click", "Send the question to the selected AI", "Return"),
+        ("Two-finger secondary click", "Return to PDF; cancel a pending request", "Esc exits mode")
+    ] : [
         ("Three quick one-finger clicks", "Enter touch mode from the welcome screen", "⌘⇧T from the reader"),
         ("Double-click", "Start, pause, or resume the current line", "Space"),
         ("Two-finger swipe left", "Read the next line, including the next page", "→"),
         ("Two-finger swipe right", "Read the previous line", "←"),
         ("Two-finger secondary click", "Replay the current line from its beginning", "R"),
         ("Two-finger swipe up / down", "Read faster / slower", "↑ / ↓"),
+        ("Triple-click while reading", "Open Draw to Ask AI", "⌘⇧A"),
         ("Escape", "Pause, leave touch mode, restore the pointer", "Esc")
-    ]
+    ] }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack { Text("Every control, in one place.").font(.title2.weight(.medium)); Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }
-            Text("In touch mode, the whole trackpad controls your lesson. A single click does nothing; there is no small button to find.")
+            Picker("Controls for", selection: $asking) { Text("Reading").tag(false); Text("Asking AI").tag(true) }.pickerStyle(.segmented)
+            Text(asking ? "The pointer stays fixed. A light tap enters a dot; a physical click sends. Swipe to separate letters at your own pace." : "In touch mode, the whole trackpad controls your lesson. A single click does nothing; there is no small button to find.")
                 .foregroundStyle(.secondary)
             Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 15) {
                 GridRow { Text("GESTURE"); Text("ACTION"); Text("KEY") }.font(.caption.weight(.bold)).foregroundStyle(.secondary)
@@ -93,8 +106,8 @@ struct ControlsGuideView: View {
                     Divider()
                 }
             }
-            Text("One tick: command accepted. Two ticks: paused. Three ticks: document boundary, speed limit, or unreadable line. A quiet line ending waits for you; it never advances by itself.").font(.system(size: 13)).lineSpacing(4)
-            Text("Use actual clicks, or taps if Tap to click is enabled in macOS. Replay requires secondary click to be enabled. Keyboard controls above work in touch mode. Switching apps or minimizing also releases the pointer and pauses. A helper can press Escape to import a PDF or configure an AI key.").font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(4)
+            Text(asking ? "The app echoes recognized marks and completed letters. Replies wait for a double-click, then use the reading gestures. Triple-click on a reply for a follow-up; two-finger click returns to your saved PDF line." : "One tick: command accepted. Two ticks: paused. Three ticks: document boundary, speed limit, or unreadable line. A quiet line ending waits for you; it never advances by itself.").font(.system(size: 13)).lineSpacing(4)
+            Text(asking ? "Light taps enter dots even when macOS Tap to click is enabled. Sending requires a physical Force Touch click; Return is a keyboard alternative. The selected provider receives your question and relevant PDF text only when you send. Escape releases the pointer and cancels a pending request." : "Use actual clicks, or taps if Tap to click is enabled in macOS. Replay requires secondary click to be enabled. Keyboard controls above work in touch mode. Switching apps or minimizing also releases the pointer and pauses. A helper can press Escape to import a PDF or configure an AI key.").font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(4)
         }.padding(30).frame(width: 790)
     }
 }

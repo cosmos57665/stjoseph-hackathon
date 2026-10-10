@@ -34,6 +34,34 @@ printable, single-page Morse alphabet sheet.
 6. Use **AI transcription** to transcribe a page or all remaining pages. This sends
    page images to the selected provider and may incur API charges.
 
+## Draw to Ask AI
+
+While reading in touch mode, **triple-click** to ask about the PDF. The ordinary
+reader also has **Draw a question for AI** (Command–Shift–A). The pointer remains
+hidden and fixed over the input surface throughout the question and reply.
+
+- **Light one-finger tap:** dot. **Horizontal finger stroke:** dash. Lift after each.
+- **Two-finger swipe right:** finish a letter. **Up:** finish a word/add a space.
+- **Two-finger swipe left:** undo a mark, letter or space. **Down:** feel the draft.
+- **Physically press the trackpad to click once:** send. A tap-to-click never sends;
+  the app requires a Force Touch pressure event with the click. Return also sends.
+- **Two-finger secondary click:** return to the same PDF position. Escape releases
+  the pointer. Either action cancels a pending request and preserves the draft.
+
+The app decodes Morse locally and uses the selected Gemini/OpenRouter/Groq key
+only when sending. It includes the current line, up to 12,000 characters of the
+current page, up to two matching page excerpts (4,000 characters each), and the
+last two question/answer pairs. This is bounded text context, not the whole PDF
+or its images. Source text is placed in a JSON data payload, separate from system
+instructions. Provider errors do not expose raw responses or credentials.
+
+Replies wait for a **double-click** to play in tactile Morse. Left/right swipes
+advance/backtrack through reply lines, up/down change speed, **R** replays, and
+**triple-click** starts a follow-up. Two-finger secondary click returns to the PDF.
+Recognized marks and completed letters are echoed through the tactile player.
+The draft is limited to 240 characters; new documents clear the conversation.
+See [the test and gesture guide](docs/Controls-Guide.md#ask-ai-about-your-pdf).
+
 ## Providers and keys
 
 Gemini, OpenRouter, and Groq each have a masked API-key field and an editable model
@@ -77,6 +105,9 @@ provider calls were made during initial development because no user keys were su
   capture is foreground-only and ends on Escape, focus loss or window changes.
   No global input hooks or Accessibility permission are needed. Reading uses
   nonempty source/OCR lines without arbitrary word-count splits.
+- **MorseDrawingSurface / AskAIModel**: raw trackpad contact/stroke recognition,
+  pressure-confirmed submission, local Morse decoding and editing, bounded PDF
+  context, duplicate-request protection, cancellation and line-by-line replies.
 - **SwiftUI**: reader, practice, provider settings, original-PDF preview, text export,
   keyboard actions, system accessibility labels, reduced-motion handling and a
   solid-surface option (also respects Reduce Transparency).
@@ -124,10 +155,11 @@ checks Escape, key-window changes, window movement and app deactivation, with a
 instructions; it does not capture the pointer.
 
 Run `"dist/Luma Touch.app/Contents/MacOS/LumaTouch" --verify-ui` from this project
-directory to capture the app's own welcome/touch/reader/practice/provider views into the ignored
+directory to capture the app's own welcome/touch/reader/AI/practice/provider views into the ignored
 `verification/` folder. This does not capture other applications or send requests.
-It briefly tests touch-mode pointer capture, restores the pointer, and leaves the
-welcome screen open.
+It uses an explicitly labelled simulated AI reply and no saved keys, tests
+touch-mode pointer capture, restores the pointer, then exits. Open the app normally
+afterward to test with real input and your own provider key.
 
 `scripts/make_practice_pdfs.py` regenerates the original practice PDFs using
 ReportLab and pypdfium2. Generated PDFs are included, so Python is not needed to
@@ -136,6 +168,8 @@ build or use the application.
 ## References
 
 - [Apple haptic feedback](https://developer.apple.com/documentation/appkit/nshapticfeedbackmanager)
+- [Apple trackpad touch positions](https://developer.apple.com/documentation/appkit/nstouch/normalizedposition)
+- [Apple pressure event information](https://developer.apple.com/documentation/appkit/nsevent/associatedeventsmask)
 - [Google image understanding](https://ai.google.dev/gemini-api/docs/image-understanding)
 - [OpenRouter multimodal inputs](https://openrouter.ai/docs/guides/overview/multimodal/images)
 - [Groq vision](https://console.groq.com/docs/vision)

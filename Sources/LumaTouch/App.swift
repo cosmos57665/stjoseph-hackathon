@@ -2,7 +2,18 @@ import SwiftUI
 
 @main struct LumaTouchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    @StateObject private var model = Workspace()
+    @StateObject private var model: Workspace
+    init() {
+        let verifying = CommandLine.arguments.contains("--verify-ui")
+        let assistant: AskAIModel? = verifying ? AskAIModel(player: HapticPlayer(output: { _ in }), isDemonstration: true) { _, prompt in
+            let data = try JSONSerialization.jsonObject(with: Data(prompt.utf8)) as! [String: Any]
+            precondition(data["learner_question"] as? String == "WHY")
+            precondition(data["document_excerpts"] != nil)
+            try await Task.sleep(nanoseconds: 500_000_000)
+            return "Demo reply. Your question is linked to the current PDF passage.\nThis response is simulated for testing, with no API request."
+        } : nil
+        _model = StateObject(wrappedValue: Workspace(loadPreferences: !verifying, assistant: assistant))
+    }
     var body: some Scene {
         WindowGroup("Luma Touch") {
             ContentView(model: model)
@@ -20,6 +31,7 @@ import SwiftUI
         .commands {
             CommandGroup(replacing: .newItem) { Button("Import PDF…", action: model.importPDF).keyboardShortcut("o", modifiers: .command).disabled(model.busy) }
             CommandMenu("Playback") {
+                Button("Ask AI about this PDF", action: model.enterAskMode).keyboardShortcut("a", modifiers: [.command, .shift]).disabled(!model.readingControlsAvailable || model.pages.isEmpty)
                 Button("Enter touch mode", action: model.enterTouchMode).keyboardShortcut("t", modifiers: [.command, .shift]).disabled(model.busy || model.showTextEntry || model.showPDF || model.error != nil)
                 Button("Exit touch mode", action: model.exitTouchMode).keyboardShortcut(.escape, modifiers: []).disabled(!model.touchMode && !model.showTouchWelcome)
                 Button("Play / Pause", action: model.toggleReading).keyboardShortcut("p", modifiers: [.command]).disabled(!model.readingControlsAvailable)
@@ -83,6 +95,46 @@ import SwiftUI
             try? await Task.sleep(nanoseconds: 300_000_000)
             checks["escapeExits"] = !model.touchMode && !model.showTouchWelcome && !model.player.isPlaying
             snapshot("reader")
+            model.enterTouchMode()
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            click(3)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            checks["readerTripleOpensAI"] = model.askMode && model.touchMode
+            for character in "WHY" {
+                for mark in Morse.alphabet[character]! { key(mark == "." ? 47 : 27, String(mark)) }
+                key(124, "")
+            }
+            checks["drawnMorseDecodesQuestion"] = model.assistant.draft.text == "WHY"
+            snapshot("ask-draft")
+            model.dark = true
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            snapshot("ask-draft-dark")
+            model.dark = false
+            click(1)
+            checks["tapClickDoesNotSend"] = model.assistant.phase == .composing
+            @MainActor func drawingSurface(_ view: NSView) -> MorseDrawingNSView? {
+                if let drawing = view as? MorseDrawingNSView { return drawing }
+                for child in view.subviews { if let drawing = drawingSurface(child) { return drawing } }
+                return nil
+            }
+            // The transport is injected above. This placeholder never leaves the process.
+            model.keys[model.provider] = "verification-placeholder-not-a-key"
+            if let content = NSApp.keyWindow?.contentView { drawingSurface(content)?.receivedPressure(stage: 1) }
+            click(1)
+            checks["physicalClickStartsOneQuestion"] = model.assistant.phase == .waiting
+            model.keys[model.provider] = ""
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            checks["simulatedAnswerReady"] = model.assistant.phase == .answer && !model.assistant.player.isPlaying
+            snapshot("ask-answer")
+            key(49, " ")
+            checks["answerCanPlay"] = model.assistant.player.isPlaying
+            key(124, "")
+            checks["answerLineNavigation"] = model.assistant.answerLine == 1
+            let savedLine = model.selectedLine
+            model.returnFromQuestion()
+            checks["returnKeepsPDFPosition"] = !model.askMode && model.selectedLine == savedLine && model.touchMode
+            key(53, "\u{1b}")
+            try? await Task.sleep(nanoseconds: 300_000_000)
             model.showControls = true
             try? await Task.sleep(nanoseconds: 500_000_000)
             snapshot("controls-guide")
@@ -102,7 +154,8 @@ import SwiftUI
             let result: [String: Any] = ["pages": model.pages.count, "title": model.title, "morseSymbols": model.player.symbols.count,
                                        "providers": Provider.allCases.map(\.rawValue), "networkRequests": 0, "touchChecks": checks]
             if let data = try? JSONSerialization.data(withJSONObject: result, options: .prettyPrinted) { try? data.write(to: dir.appendingPathComponent("ui-result.json")) }
-            model.showTouchWelcome = true
+            model.stopAll()
+            NSApp.terminate(nil)
         }
     }
 }
@@ -179,7 +232,11 @@ struct ContentView: View {
                 .allowsHitTesting(!model.touchMode && !model.showTouchWelcome)
                 .accessibilityHidden(model.touchMode || model.showTouchWelcome)
             if model.touchMode || model.showTouchWelcome {
-                TouchReadingView(model: model, player: model.player, onCommand: handleTouchCommand)
+                if model.askMode {
+                    AskAIView(model: model, assistant: model.assistant, player: model.assistant.player) { handleTouchCommand(.exitTouchMode) }
+                } else {
+                    TouchReadingView(model: model, player: model.player, onCommand: handleTouchCommand)
+                }
             }
         }.tint(Color.ocean)
             .onAppear {
@@ -243,6 +300,7 @@ struct ContentView: View {
         case .faster: model.changeSpeed(1)
         case .slower: model.changeSpeed(-1)
         case .pause: model.pauseReading()
+        case .askQuestion: model.enterAskMode()
         }
     }
 }

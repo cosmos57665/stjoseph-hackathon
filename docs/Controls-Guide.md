@@ -35,6 +35,7 @@ performs one command, even if the trackpad produces scrolling momentum.
 | Make playback slower | Swipe two fingers down | Down arrow |
 | Pause and exit touch mode | — | Escape |
 | Enter touch mode from the ordinary reader | Use the touch-mode control | Command–Shift–T |
+| Ask a question about the PDF | Triple-click while in reading mode | Command–Shift–A |
 
 A **click** means pressing the trackpad, not just resting or moving a finger.
 If macOS Tap to click is enabled, its taps can produce the corresponding click
@@ -124,3 +125,58 @@ testing the controls.
 The controls can be tested without an API key. Live AI transcription requires a
 working provider key. Independent use, gesture comfort and cue distinguishability
 still need testing with the intended learners.
+
+## Ask AI about your PDF
+
+Open **Draw a question for AI** from the reader, or **triple-click** while already
+in touch reading mode. The mouse stays hidden and fixed inside the app. Use one
+finger for marks and two fingers for commands. Your PDF position is preserved.
+
+| Input | Action | Keyboard alternative |
+| --- | --- | --- |
+| Light, brief tap without pressing | Add a dot | Period |
+| Horizontal finger stroke, then lift | Add a dash | Hyphen |
+| Two-finger swipe right | Finish the current letter | Right arrow or Space |
+| Two-finger swipe up | Finish the current letter and add a word space | Up arrow |
+| Two-finger swipe left | Remove the last mark, or the last completed letter/space | Left arrow or Delete |
+| Two-finger swipe down | Review your question as tactile Morse | Down arrow |
+| One physical press-and-click | Send to the selected AI; finish the final letter automatically | Return |
+| Two-finger secondary click | Return to the PDF and cancel an unfinished request | Escape exits touch mode |
+
+**Tap and click are different here.** A dot is a short contact and lift, with very
+little movement. Resting longer than about half a second does not add a dot.
+Sending requires a physical Force Touch click with a pressure event, so macOS
+Tap to click does not send a question. There is no need to turn that setting off.
+Non-pressure mice/trackpads can use Return to send. Physical recognition still
+needs testing on the user's hardware; no input classifier is guaranteed perfect.
+
+Each accepted mark is echoed after a short delay; finishing a letter echoes that
+letter. A new input interrupts the previous echo. Invalid shapes or impossible
+patterns give the three-tick error cue. Swipe down to review before sending.
+Questions stay on your Mac until you send. A missing key keeps the draft and
+plays NO API KEY; a failed request keeps it and plays AI ERROR.
+
+The selected provider receives the decoded question, current line, bounded current
+and matching PDF page excerpts, and the last two exchanges. It does not receive
+the raw finger drawing or API keys in the prompt. OCR errors can affect answers.
+
+When the reply arrives, one tick signals ready. **Double-click** to play/pause;
+**swipe left/right** for next/previous answer line; **up/down** for speed. **R**
+replays the answer line. **Triple-click** (or A) starts a follow-up. **Two-finger
+click** returns to your PDF. **Escape** always exits touch mode and restores the
+pointer; changing apps also exits and cancels any pending request.
+
+### Try it without sending a request
+
+1. Open Draw to Ask. Tap four times, then swipe right: the completed letter is H.
+2. Tap twice, then swipe right: the question now reads HI.
+3. Swipe down to feel HI. A normal tap must add a dot, never start a request.
+4. Swipe left once to remove that extra dot, then left again to remove I.
+5. Draw a horizontal stroke and swipe right: the last completed letter becomes T.
+6. Two-finger click returns to the unchanged PDF line. Reopen to find the draft kept.
+7. Press Escape; typing and pointer movement should work normally again.
+
+To test a real question, add a working provider key, choose a PDF passage, and
+enter **WHY**: W is `.--`, H is `....`, Y is `-.--`. Swipe right after each letter,
+then physically click once. The answer should reference the selected passage.
+Rapid additional clicks while waiting must not create duplicate requests.

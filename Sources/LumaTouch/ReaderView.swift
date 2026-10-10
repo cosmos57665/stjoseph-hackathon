@@ -226,6 +226,9 @@ struct PlayerPanel: View {
             }.buttonStyle(ActionStyle(prominent: true)).disabled(model.busy || model.readingLines.isEmpty)
             Text("Double-click to pause. Swipe to change lines.\nEscape brings the pointer back.")
                 .font(.system(size: 10)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(3)
+            Button(action: model.enterAskMode) {
+                Label("Draw a question for AI", systemImage: "pencil.and.scribble").frame(maxWidth: .infinity)
+            }.buttonStyle(ActionStyle()).disabled(model.busy)
             HStack {
                 Button { model.changeSpeed(-1) } label: { Label("Slower", systemImage: "minus") }
                 Spacer(minLength: 4)
