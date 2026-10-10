@@ -19,8 +19,8 @@ struct TouchReadingView: View {
                 if welcoming {
                     Image(systemName: "hand.point.up.braille.fill").font(.system(size: 58, weight: .light)).foregroundStyle(Color.ocean)
                     Text("Your touch. Your pace.").font(.system(size: 42, weight: .medium)).tracking(-1.5)
-                    Text("Three quick clicks to begin.").font(.system(size: 26, weight: .medium))
-                    Text("Click the trackpad three times with one finger.\nThe pointer will stay inside this window and disappear.")
+                    Text("Press Space to begin.").font(.system(size: 26, weight: .medium))
+                    Text("Or click three times, up to one second apart.\nKeep the pointer over this window until it disappears.")
                         .font(.system(size: 17)).foregroundStyle(.secondary).lineSpacing(6).multilineTextAlignment(.center)
                     if model.busy { ProgressView(model.activity) }
                     else { Label("Practice PDF ready · no API key needed", systemImage: "doc.text").font(.system(size: 13)).foregroundStyle(.secondary) }
@@ -50,8 +50,8 @@ struct TouchReadingView: View {
                 Text(welcoming ? "ESC  ·  Open standard controls" : "3 clicks  ·  Ask AI about this PDF     |     ESC  ·  Restore the pointer")
                     .font(.system(size: 14, weight: .semibold)).padding(.bottom, 7)
             }.padding(32).allowsHitTesting(false).accessibilityHidden(true)
-            TouchControlSurface(activationOnly: welcoming, focusOnAppear: true, allowsQuestionEntry: !welcoming,
-                                accessibilityValue: welcoming ? "Three clicks to enter touch mode" : "\(model.lineLabel). \(player.status)", onCommand: onCommand)
+            TouchControlSurface(enabled: !model.busy, activationOnly: welcoming, focusOnAppear: true, allowsQuestionEntry: !welcoming,
+                                accessibilityValue: welcoming ? "Space or three clicks to enter touch mode" : "\(model.lineLabel). \(player.status)", onCommand: onCommand)
                 .id(welcoming)
             if welcoming {
                 VStack {

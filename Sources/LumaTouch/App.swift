@@ -90,7 +90,7 @@ import SwiftUI
             snapshot("touch-welcome")
             click(1); click(2)
             checks["twoClicksDoNotEnter"] = model.showTouchWelcome && !model.touchMode
-            click(3)
+            click(1)
             try? await Task.sleep(nanoseconds: 700_000_000)
             checks["tripleClickEnters"] = model.touchMode && !model.player.isPlaying
             snapshot("touch-reader")

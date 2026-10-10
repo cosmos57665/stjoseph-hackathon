@@ -141,7 +141,7 @@ import AppKit
         for count in 1...4 { view.mouseDown(with: mouseEvent(.leftMouseDown, count: count)) }
         expectEqual(commands, [.enterTouchMode])
         view.keyDown(with: keyEvent(49, characters: " "))
-        expectEqual(commands, [.enterTouchMode])
+        expectEqual(commands, [.enterTouchMode, .enterTouchMode])
         view.keyDown(with: keyEvent(53, characters: "\u{1B}"))
         expectEqual(commands.last, .exitTouchMode)
         expectTrue(view.accessibilityPerformPress())

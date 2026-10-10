@@ -123,26 +123,40 @@ struct TouchControlSurface: NSViewRepresentable {
         view.setAccessibilityValue(accessibilityValue)
         view.setAccessibilityLabel(activationOnly ? "Enter touch mode" : "Touch controls")
         view.setAccessibilityHelp(activationOnly
-            ? "Triple-click to enter touch mode. Escape opens the standard interface."
+            ? "Press Space or click three times to enter touch mode. Escape opens the standard interface."
             : "Double-click to play or pause. Swipe two fingers left for the next line or right for the previous line. Swipe up for faster playback or down for slower playback. Right-click to replay. When focused: Space plays or pauses, left and right arrows change lines, R replays, up and down arrows change speed, and Escape pauses and exits touch mode.")
+    }
+}
+
+struct StartClickSequence {
+    private var count = 0
+    private var last: TimeInterval?
+    mutating func reset() { count = 0; last = nil }
+    mutating func click(at timestamp: TimeInterval) -> Bool {
+        if let last, timestamp >= last, timestamp - last <= 1.0 { count += 1 }
+        else { count = 1 }
+        last = timestamp
+        if count >= 3 { reset(); return true }
+        return false
     }
 }
 
 final class TouchControlNSView: NSView {
     var onCommand: ((TouchCommand) -> Void)?
     var activationOnly = false {
-        didSet { if oldValue != activationOnly { interpreter.reset() } }
+        didSet { if oldValue != activationOnly { interpreter.reset(); startClicks.reset() } }
     }
     var focusOnAppear = false
     var allowsSpeedGestures = true
     var allowsQuestionEntry = false
     var inputEnabled = true {
         didSet {
-            if !inputEnabled { interpreter.reset() }
+            if !inputEnabled { interpreter.reset(); startClicks.reset() }
             if oldValue != inputEnabled { needsDisplay = true }
         }
     }
     private var interpreter = TouchGestureInterpreter()
+    private var startClicks = StartClickSequence()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -200,6 +214,10 @@ final class TouchControlNSView: NSView {
             return
         }
         window?.makeFirstResponder(self)
+        if activationOnly {
+            if startClicks.click(at: event.timestamp) { onCommand?(.enterTouchMode) }
+            return
+        }
         if allowsQuestionEntry, !activationOnly, event.clickCount == 3 { onCommand?(.askQuestion); return }
         if let command = TouchGestureInterpreter.clickCommand(clickCount: event.clickCount, activationOnly: activationOnly) { onCommand?(command) }
     }
@@ -245,7 +263,8 @@ final class TouchControlNSView: NSView {
                                                             characters: event.charactersIgnoringModifiers,
                                                             modifiers: event.modifierFlags,
                                                             isRepeat: event.isARepeat) {
-            if !activationOnly || command == .exitTouchMode { onCommand?(command) }
+            if activationOnly && command == .togglePlayback { startClicks.reset(); onCommand?(.enterTouchMode) }
+            else if !activationOnly || command == .exitTouchMode { onCommand?(command) }
         } else {
             // Leave tab navigation, VoiceOver shortcuts and application commands
             // on the normal responder chain. No key monitor touches text fields.

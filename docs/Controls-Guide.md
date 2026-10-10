@@ -270,3 +270,11 @@ lesson. Shortcuts leave the current mode unchanged during loading, text-entry di
 controls sheets and errors so they do not discard an in-progress edit. Plain arrows
 retain the current mode's controls. Activation does not automatically send data or
 start reading a long passage.
+
+## Starting reliably (0.5.3)
+
+On the welcome screen, press Space to enter touch reading. Alternatively, click
+three times with at most one second between clicks while the pointer is over the
+welcome window. This no longer depends on macOS classifying a triple-click or on
+keeping the pointer at exactly the same spot. Loading must finish first. The pointer
+is captured after entry; Space then plays/pauses. Command–Up is another direct entry.

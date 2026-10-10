@@ -4,6 +4,14 @@ import AppKit
     let stroke = [CGPoint(x: 0.2, y: 0.2), CGPoint(x: 0.2, y: 0.5)]
     let config = AIConfiguration(provider: .gemini, key: "test-only", model: "test-model")
     func run() async throws {
+        var start = StartClickSequence()
+        expectFalse(start.click(at: 1)); expectFalse(start.click(at: 1.8)); expectTrue(start.click(at: 2.6))
+        expectFalse(start.click(at: 4)); expectFalse(start.click(at: 6)); expectFalse(start.click(at: 6.5)); expectTrue(start.click(at: 7))
+        let welcome = TouchControlNSView(); welcome.activationOnly = true
+        var starts = 0
+        welcome.onCommand = { if $0 == .enterTouchMode { starts += 1 } }
+        welcome.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, characters: " ", charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49)!)
+        expectEqual(starts, 1)
         let surface = MorseDrawingNSView()
         surface.handwriting = true
         var commands: [DrawingCommand] = []
