@@ -37,7 +37,7 @@ struct AskAIView: View {
                     .font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity)
                 Text(assistant.phase == .answer
                      ? "AI can make mistakes. Check the explanation against your PDF."
-                     : assistant.handwritingMode ? "First click sends only your drawing for transcription. A second click sends the recognized message and PDF context to AI." : "One click sends your question, recent conversation and relevant extracted PDF text to \(model.provider.rawValue).")
+                     : assistant.handwritingMode ? "Space transcribes your drawing. Review the text, then Space sends it to AI with PDF context." : "One click sends your question, recent conversation and relevant extracted PDF text to \(model.provider.rawValue).")
                     .font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: .infinity)
             }.padding(32).allowsHitTesting(false).accessibilityHidden(true)
             MorseDrawingSurface(handwriting: assistant.handwritingMode, phase: assistant.phase, value: "\(assistant.compositionText). \(assistant.status)",
@@ -84,7 +84,7 @@ struct AskAIView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Reply · line \(assistant.answerLine + 1) of \(assistant.answerLines.count)").font(.caption.weight(.semibold))
                         Text(assistant.currentAnswerLine).font(.system(size: 15)).lineLimit(2)
-                        Text("Double-click to feel the reply. Triple-click or press A to write your next message.")
+                        Text("Space: play / pause. Return: write your next message.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -106,7 +106,7 @@ struct AskAIView: View {
                                 context.stroke(path, with: .color(.ocean), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                             }
                         }.frame(width: 230, height: 120).background(.white.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
-                        Text("\(assistant.handwriting.cells.count) saved · Swipe right after each letter").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text("\(assistant.handwriting.cells.count) saved · → saves each letter").font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                     VStack(alignment: .leading, spacing: 12) {
                         Text(assistant.recognizedText ?? "Write your message…")
@@ -114,10 +114,10 @@ struct AskAIView: View {
                             .frame(maxWidth: .infinity, minHeight: 45, alignment: .topLeading)
                         Text(assistant.status).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(3)
                         HStack {
-                            Text("? = uncertain · Swipe left to correct").font(.system(size: 10)).foregroundStyle(.secondary)
+                            Text("? = uncertain · ← to correct").font(.system(size: 10)).foregroundStyle(.secondary)
                             Spacer()
                             if assistant.phase == .waiting { ProgressView().controlSize(.small) }
-                            else { Label(assistant.recognizedText == nil ? "Click / Return to transcribe" : "Click / Return to send", systemImage: "arrow.up.circle.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.ocean) }
+                            else { Label(assistant.recognizedText == nil ? "Space to transcribe" : "Space to send", systemImage: "arrow.up.circle.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.ocean) }
                         }
                     }
                 }.padding(18).glass(solid: model.solid)
@@ -214,15 +214,15 @@ struct AskAIView: View {
     private var gestureGuide: some View {
         HStack(spacing: 15) {
             if assistant.phase == .answer {
-                guide("2 clicks", "Play / pause")
-                guide("Swipe left / right", "Next / previous line")
-                guide("Swipe up / down", "Faster / slower")
-                guide("3 clicks", "New question")
+                guide("Space", "Play / pause")
+                guide("← / →", "Previous / next line")
+                guide("↑ / ↓", "Faster / slower")
+                guide("Return", "Write next message")
             } else {
-                guide("Swipe right", "Finish letter")
-                guide("Swipe up", "Word space")
-                guide("Swipe left", "Undo")
-                guide("Swipe down", assistant.handwritingMode ? "Feel message" : "Feel question")
+                guide("→", "Finish letter")
+                guide("↑", "Word space")
+                guide("←", "Undo")
+                guide("↓", assistant.handwritingMode ? "Feel message" : "Feel question")
             }
         }.padding(20).glass(solid: model.solid)
     }

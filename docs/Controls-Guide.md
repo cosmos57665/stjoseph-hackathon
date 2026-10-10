@@ -234,3 +234,22 @@ Command–Shift–N starts a new chat and clears messages, drafts and AI context
 cancelling any pending request. History remains in this app session only. All
 completed exchanges are displayed; only the last two exchanges are sent as AI
 conversation context, alongside relevant current PDF excerpts.
+
+## Keyboard-first communication (0.5.1)
+
+These keyboard controls replace the earlier Space-to-finish-letter mapping for
+**handwriting chat only**. The trackpad still draws letters; gestures remain optional.
+
+| Key | Writing / reviewing your draft | Reading an AI reply |
+| --- | --- | --- |
+| Space | Transcribe drawing; once recognized, send the reviewed text | Play / pause |
+| Right | Save letter and clear drawing pad | Next reply line |
+| Left | Undo stroke / reopen saved letter | Previous reply line |
+| Up | Add word space | Faster |
+| Down | Review recognized text in Morse | Slower |
+| Return | Same as Space | Start writing a follow-up |
+| Escape | Release pointer, cancel pending request | Release pointer |
+
+While waiting for AI, Space and arrows do not start another request. Morse input
+mode retains Space to finish a Morse letter and Return to send. PDF reading already
+supports Space play/pause and arrows for navigation/speed. Command–Shift–N clears chat.

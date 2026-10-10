@@ -197,7 +197,8 @@ final class MorseDrawingNSView: NSView {
         if phase == .composing {
             switch event.keyCode {
             case 36, 76: onCommand?(.send)
-            case 124, 49: onCommand?(.finishLetter)
+            case 49: onCommand?(handwriting ? .send : .finishLetter)
+            case 124: onCommand?(.finishLetter)
             case 126: onCommand?(.space)
             case 123, 51: onCommand?(.undo)
             case 125: onCommand?(.review)
@@ -209,6 +210,7 @@ final class MorseDrawingNSView: NSView {
         } else if phase == .answer {
             switch event.keyCode {
             case 49: onCommand?(.toggleAnswer)
+            case 36, 76: onCommand?(.newQuestion)
             case 124: onCommand?(.nextAnswer)
             case 123: onCommand?(.previousAnswer)
             case 126: onCommand?(.faster)

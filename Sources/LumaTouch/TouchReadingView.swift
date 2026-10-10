@@ -78,12 +78,12 @@ struct ControlsGuideView: View {
     private var writing: Bool { section == 2 }
     private var rows: [(String, String, String)] { writing ? [
         ("Draw with one finger", "Print a letter; lift between its strokes", "⌘⇧H opens this mode"),
-        ("Two-finger swipe right", "Save the letter and clear the drawing pad", "→ / Space"),
+        ("Two-finger swipe right", "Save the letter and clear the drawing pad", "→"),
         ("Two-finger swipe up", "Finish the letter and add a word space", "↑"),
         ("Two-finger swipe left", "Undo a stroke or reopen the saved letter", "← / Delete"),
-        ("One physical click", "Transcribe the drawing into a message", "Return"),
+        ("One physical click", "Transcribe the drawing into a message", "Space / Return"),
         ("Two-finger swipe down", "Review the transcription in Morse", "↓"),
-        ("Another physical click", "Ask AI about the recognized message", "Return"),
+        ("Another physical click", "Ask AI about the recognized message", "Space / Return"),
         ("Two-finger secondary click", "Return to the reader, keeping the draft", "Esc releases pointer")
     ] : asking ? [
         ("Light one-finger tap", "Add a Morse dot without pressing", "."),

@@ -150,17 +150,17 @@ import SwiftUI
             model.assistant.addStroke([CGPoint(x: 0.4, y: 0.2), CGPoint(x: 0.4, y: 0.5)])
             snapshot("handwriting-draft")
             model.keys[model.provider] = "verification-placeholder-not-a-key"
-            key(36, "\r")
+            key(49, " ")
             try? await Task.sleep(nanoseconds: 500_000_000)
             checks["handwritingTranscribesWithoutAsking"] = model.assistant.recognizedText == "HI" && model.assistant.phase == .composing
             snapshot("handwriting-message")
             key(125, "")
             checks["handwritingReviewPlays"] = model.assistant.player.isPlaying
-            key(36, "\r")
+            key(49, " ")
             try? await Task.sleep(nanoseconds: 800_000_000)
             checks["chatShowsExchange"] = model.assistant.messages.count == 4 && model.assistant.phase == .answer
             snapshot("handwriting-chat")
-            key(0, "a")
+            key(36, "\r")
             checks["chatFollowupKeepsHistory"] = model.assistant.phase == .composing && model.assistant.messages.count == 4
             snapshot("handwriting-followup")
             model.keys[model.provider] = ""

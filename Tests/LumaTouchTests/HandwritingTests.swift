@@ -4,6 +4,23 @@ import AppKit
     let stroke = [CGPoint(x: 0.2, y: 0.2), CGPoint(x: 0.2, y: 0.5)]
     let config = AIConfiguration(provider: .gemini, key: "test-only", model: "test-model")
     func run() async throws {
+        let surface = MorseDrawingNSView()
+        surface.handwriting = true
+        var commands: [DrawingCommand] = []
+        surface.onCommand = { commands.append($0) }
+        func key(_ code: UInt16, repeatKey: Bool = false) {
+            let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: repeatKey, keyCode: code)!
+            surface.keyDown(with: e)
+        }
+        for code: UInt16 in [49, 124, 126, 123, 125] { key(code) }
+        expectEqual(commands, [.send, .finishLetter, .space, .undo, .review])
+        commands = []; surface.phase = .waiting; key(49); expectTrue(commands.isEmpty)
+        surface.phase = .answer
+        for code: UInt16 in [49, 124, 123, 126, 125, 36] { key(code) }
+        expectEqual(commands, [.toggleAnswer, .nextAnswer, .previousAnswer, .faster, .slower, .newQuestion])
+        commands = []; surface.phase = .composing; surface.handwriting = false; key(49)
+        expectEqual(commands, [.finishLetter])
         var draft = HandwritingDraft()
         expectThrows(try draft.jpeg()); expectThrows(try draft.finish()); expectThrows(try draft.space())
         expectThrows(try draft.append([CGPoint(x: CGFloat.infinity, y: 0)]))

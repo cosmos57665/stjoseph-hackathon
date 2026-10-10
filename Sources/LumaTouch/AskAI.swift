@@ -103,7 +103,7 @@ struct ChatMessage: Identifiable {
         self.context = context
         phase = .composing
         status = "Tap for dot, stroke for dash. Swipe right after each letter. Press to click and send."
-        if handwritingMode { status = "Print one letter. Swipe right to save it. Click to transcribe your message." }
+        if handwritingMode { status = "Print one letter. Right arrow saves it. Space transcribes your message." }
         player.cue(.ready)
     }
 
@@ -205,7 +205,7 @@ struct ChatMessage: Identifiable {
                     answer = result; answerLine = 0; phase = .answer; draft = MorseDraft(); handwriting = HandwritingDraft(); recognizedText = nil; stroke = []; lastShape = nil
                     history.append(["question": question, "answer": String(result.prefix(3000))]); history = Array(history.suffix(2))
                     player.load(currentAnswerLine)
-                    status = "Answer ready. Double-click to feel it; swipe left for the next line."
+                    status = "Answer ready. Space plays or pauses; Right arrow reads the next line. Return starts a follow-up."
                     player.cue(.ready) // Never start a long reply unexpectedly.
                     task = nil
                 } catch {
@@ -232,7 +232,7 @@ struct ChatMessage: Identifiable {
                     guard generation == token else { return }
                     recognizedText = try HandwritingPrompt.parse(result, cells: cells)
                     phase = .composing; task = nil
-                    status = "Message ready. Swipe down to feel it. Click again only if you want to ask AI. Swipe left to correct."
+                    status = "Message ready. Down arrow reviews it. Space sends it to AI. Left arrow undoes."
                     player.cue(.ready)
                 } catch {
                     guard generation == token else { return }
