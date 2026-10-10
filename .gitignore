@@ -1,0 +1,13 @@
+.build/
+dist/
+.DS_Store
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.mobileprovision
+verification/
+UI_ASSET_KIT/
+*.zip
+.swiftpm/
