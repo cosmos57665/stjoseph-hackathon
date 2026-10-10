@@ -26,17 +26,40 @@ enum PDFReader {
                 pages.append(LessonPage(id: i, source: embedded, extraction: "PDF text"))
             } else {
                 let image = try render(page)
-                let request = VNRecognizeTextRequest()
-                request.recognitionLevel = .accurate
-                request.usesLanguageCorrection = true
-                request.automaticallyDetectsLanguage = true
-                try VNImageRequestHandler(cgImage: image).perform([request])
-                let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+                let text = recognize(image)
                 pages.append(LessonPage(id: i, source: text.isEmpty ? embedded : text,
                                         extraction: text.isEmpty ? "Needs AI transcription" : "On-device OCR"))
             }
         }
         return pages
+    }
+
+    private final class RecognitionResult: @unchecked Sendable {
+        private let lock = NSLock()
+        private var text = ""
+        func set(_ text: String) { lock.lock(); self.text = text; lock.unlock() }
+        func get() -> String { lock.lock(); defer { lock.unlock() }; return text }
+    }
+
+    static func recognize(_ image: CGImage) -> String {
+        let result = RecognitionResult()
+        let finished = DispatchSemaphore(value: 0)
+        let request = VNRecognizeTextRequest()
+        request.revision = VNRecognizeTextRequestRevision3
+        request.recognitionLevel = .fast
+        request.usesLanguageCorrection = false
+        request.recognitionLanguages = ["en-US"]
+        // Bound OS recognition work. A missing language asset must not stop PDF
+        // import; the original page can still be sent to a vision provider.
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { finished.signal() }
+            do {
+                try VNImageRequestHandler(cgImage: image).perform([request])
+                result.set((request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n"))
+            } catch { /* Mark the page for explicit AI transcription. */ }
+        }
+        if finished.wait(timeout: .now() + 8) == .timedOut { request.cancel(); return "" }
+        return result.get()
     }
 
     static func render(_ page: PDFPage) throws -> CGImage {
@@ -59,11 +82,13 @@ enum PDFReader {
     }
 
     static func imageData(url: URL, page index: Int) throws -> Data {
-        guard let page = PDFDocument(url: url)?.page(at: index) else { throw AppError.message("The PDF is no longer available. Import it again.") }
-        let bitmap = NSBitmapImageRep(cgImage: try render(page))
-        guard let data = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else {
-            throw AppError.message("Could not prepare the page image.")
+        guard let document = PDFDocument(url: url), let page = document.page(at: index) else { throw AppError.message("The PDF is no longer available. Import it again.") }
+        return try withExtendedLifetime(document) {
+            let bitmap = NSBitmapImageRep(cgImage: try render(page))
+            guard let data = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else {
+                throw AppError.message("Could not prepare the page image.")
+            }
+            return data
         }
-        return data
     }
 }

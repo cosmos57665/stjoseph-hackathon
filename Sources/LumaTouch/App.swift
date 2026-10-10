@@ -37,10 +37,15 @@ import SwiftUI
             let dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("verification")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             @MainActor func snapshot(_ name: String) {
-                guard let window = NSApp.windows.first(where: { $0.isVisible }), let view = window.contentView,
-                      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
-                view.cacheDisplay(in: view.bounds, to: rep)
-                if let png = rep.representation(using: .png, properties: [:]) { try? png.write(to: dir.appendingPathComponent(name + ".png")) }
+                guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
+                // Capture the composited window, not a costly software redraw of
+                // every translucent layer. Restrict capture to this app's window.
+                try? String(window.windowNumber).write(to: dir.appendingPathComponent("window-id.txt"), atomically: true, encoding: .utf8)
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                process.arguments = ["-x", "-o", "-l", String(window.windowNumber), dir.appendingPathComponent(name + ".png").path]
+                try? process.run()
+                process.waitUntilExit()
             }
             snapshot("reader")
             model.screen = .practice
